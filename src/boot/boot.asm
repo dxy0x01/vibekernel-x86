@@ -23,38 +23,52 @@ start:
     call print_string
     
     ; --- IVT Code Start ---
-    ; Hook interrupt 0x44 (arbitrary choice)
-    ; IVT entry for 0x44 is at 0x44 * 4 = 170 * 4 = 680 = 0x2A8
-    cli                     ; Disable interrupts while changing IVT
-    
+    ; Hook interrupt 0x00 (Divide by Zero)
+    cli
     xor ax, ax
-    mov es, ax              ; ES = 0 because IVT is at 0x0000
+    mov es, ax
     
     ; Store Offset (address of handler)
-    mov word [es:0x44*4], handle_int44
+    mov word [es:0x00*4], handle_isr0
     
     ; Store Segment (0x0000)
-    mov word [es:0x44*4+2], 0x0000
+    mov word [es:0x00*4+2], 0x0000
     
-    sti                     ; Enable interrupts
+    sti
     
-    ; Trigger our custom interrupt
-    mov si, msg_trigger
+    ; Trigger Divide by Zero
+    mov si, msg_trigger_zero
     call print_string
-    int 0x44
     
+    xor ax, ax      ; Clear AX
+    mov ax, 10      ; AX = 10
+    mov bx, 0       ; BX = 0
+    div bx          ; 10 / 0 -> Triggers Int 0
+    
+    ; Note: Control flow might not return here if the handler doesn't handle the return address pointer adjustment carefully,
+    ; but for a simple test, we just want to see the print.
+    ; Real mode 'div' fault pushes CS:IP pointing to the instruction that caused the fault, so 'iret' would retry it (infinite loop).
+    ; We'll just halt in the handler or print and halt.
+
     ; --- IVT Code End ---
 
     ; Halt the system
     jmp $
 
 ; interrupt 0x44 handler
-handle_int44:
+; interrupt 0x00 handler (Divide by Zero)
+handle_isr0:
     pusha
-    mov si, msg_int_fired
+    mov si, msg_zero_caught
     call print_string
     popa
-    iret            ; Interrupt Return (pops CS, IP, FLAGS)
+    ; In real mode, divide error fault IP points to the instruction that caused it.
+    ; If we iret, it will re-execute 'div' and fault again (infinite loop).
+    ; We will just halt here to prove we caught it.
+    mov si, msg_halting
+    call print_string
+    cli
+    hlt
 
 ; Function: init_serial
 ; Initialize COM1 for serial output
@@ -138,8 +152,9 @@ print_string:
 ; Data section
 msg_hello: db 'VibeKernel-x86 Bootloader', 0x0D, 0x0A
            db 'Hello World from Real Mode!', 0x0D, 0x0A, 0
-msg_trigger: db 'Triggering int 0x44...', 0x0D, 0x0A, 0
-msg_int_fired: db 'Interrupt 0x44 Handled!', 0x0D, 0x0A, 0
+msg_trigger_zero: db 'Triggering Divide by Zero...', 0x0D, 0x0A, 0
+msg_zero_caught: db 'Divide by Zero Exception Caught!', 0x0D, 0x0A, 0
+msg_halting: db 'Halting System.', 0x0D, 0x0A, 0
 
 ; Padding and boot signature
 times 510-($-$$) db 0   ; Pad with zeros to byte 510
