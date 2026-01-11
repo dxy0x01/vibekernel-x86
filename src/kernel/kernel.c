@@ -8,6 +8,6 @@ void main() {
     print_string("We are in Protected Mode.\n");
     
     // Trigger interrupt
-    __asm__ __volatile__("int $2");
-    __asm__ __volatile__("int $3");
+    // __asm__ __volatile__("int $2");
+    // __asm__ __volatile__("int $3");
 }

@@ -1,5 +1,4 @@
-# VibeKernel-x86 Makefile
-# Simple Makefile for building the bootloader
+# Makefile for VibeKernel-x86
 
 # Tools
 ASM = nasm
@@ -28,6 +27,8 @@ KERNEL_C = $(KERNEL_DIR)/kernel.c
 KERNEL_OBJ = $(BIN_DIR)/kernel.o
 SCREEN_C = $(DRIVERS_DIR)/screen.c
 SCREEN_OBJ = $(BIN_DIR)/screen.o
+PORTS_C = $(DRIVERS_DIR)/ports.c
+PORTS_OBJ = $(BIN_DIR)/ports.o
 IDT_C = $(CPU_DIR)/idt.c
 IDT_OBJ = $(BIN_DIR)/idt.o
 ISR_C = $(CPU_DIR)/isr.c
@@ -66,6 +67,10 @@ $(KERNEL_OBJ): $(KERNEL_C) | $(BIN_DIR)
 $(SCREEN_OBJ): $(SCREEN_C) | $(BIN_DIR)
 	$(CC) $(CFLAGS) $(SCREEN_C) -o $(SCREEN_OBJ)
 
+# Compile Ports Driver
+$(PORTS_OBJ): $(PORTS_C) | $(BIN_DIR)
+	$(CC) $(CFLAGS) $(PORTS_C) -o $(PORTS_OBJ)
+
 # Compile IDT
 $(IDT_OBJ): $(IDT_C) | $(BIN_DIR)
 	$(CC) $(CFLAGS) $(IDT_C) -o $(IDT_OBJ)
@@ -75,8 +80,8 @@ $(ISR_OBJ): $(ISR_C) | $(BIN_DIR)
 	$(CC) $(CFLAGS) $(ISR_C) -o $(ISR_OBJ)
 
 # Link kernel
-$(KERNEL_BIN): $(KERNEL_ENTRY_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ) linker.ld
-	$(LD) $(LDFLAGS) -o $(KERNEL_BIN) $(KERNEL_ENTRY_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ)
+$(KERNEL_BIN): $(KERNEL_ENTRY_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(PORTS_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ) linker.ld
+	$(LD) $(LDFLAGS) -o $(KERNEL_BIN) $(KERNEL_ENTRY_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(PORTS_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ)
 
 # Create OS image (bootloader + kernel)
 $(OS_IMAGE): $(BOOTLOADER_BIN) $(KERNEL_BIN)
@@ -86,19 +91,9 @@ $(OS_IMAGE): $(BOOTLOADER_BIN) $(KERNEL_BIN)
 	@echo "OS Image built successfully! Size: $$(wc -c < $(OS_IMAGE)) bytes"
 	@ls -lh $(OS_IMAGE)
 
-# Run in QEMU
-run: $(OS_IMAGE)
-	$(QEMU) -drive format=raw,file=$(OS_IMAGE) -monitor stdio
-
-# Run in QEMU with debugging
-debug: $(OS_IMAGE)
-	$(QEMU) -drive format=raw,file=$(OS_IMAGE) -s -S &
-	gdb -ex "target remote localhost:1234" \
-	    -ex "set architecture i8086" \
-	    -ex "break *0x7c00" \
-	    -ex "continue"
-
-# Clean build artifacts
 clean:
 	rm -rf $(BIN_DIR)
 	@echo "Cleaned build artifacts"
+
+run: all
+	$(QEMU) -drive format=raw,file=$(OS_IMAGE) -monitor stdio

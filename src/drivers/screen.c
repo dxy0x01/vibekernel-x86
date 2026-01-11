@@ -1,4 +1,9 @@
 #include "screen.h"
+#include "ports.h"
+
+// VGA Control Register Ports
+#define REG_SCREEN_CTRL 0x3d4
+#define REG_SCREEN_DATA 0x3d5
 
 int get_cursor_offset();
 void set_cursor_offset(int offset);
@@ -33,9 +38,18 @@ void clear_screen() {
         screen[i*2+1] = WHITE_ON_BLACK;
     }
     cursor_offset = 0;
+    set_cursor_offset(cursor_offset);
 }
 
 // Private kernel functions
+
+void set_cursor_offset(int offset) {
+    offset /= 2;
+    port_byte_out(REG_SCREEN_CTRL, 14);
+    port_byte_out(REG_SCREEN_DATA, (unsigned char)(offset >> 8));
+    port_byte_out(REG_SCREEN_CTRL, 15);
+    port_byte_out(REG_SCREEN_DATA, (unsigned char)(offset & 0xff));
+}
 
 int print_char(char c, int col, int row, char attr) {
     char* vidmem = (char*) VIDEO_ADDRESS;
@@ -58,7 +72,8 @@ int print_char(char c, int col, int row, char attr) {
     
     // Check if we need to scroll (not implemented yet, just wrap)
     // if (cursor_offset >= MAX_ROWS * MAX_COLS * 2) ...
-
+    
+    set_cursor_offset(cursor_offset);
     return cursor_offset;
 }
 
