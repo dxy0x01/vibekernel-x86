@@ -5,6 +5,9 @@
 [ORG 0x7C00]        ; BIOS loads bootloader at address 0x7C00
 
 start:
+    ; Save boot drive number (passed in DL by BIOS)
+    mov [boot_drive], dl
+
     ; Initialize segment registers
     xor ax, ax      ; Zero out AX
     mov ds, ax      ; Set Data Segment to 0
@@ -22,53 +25,37 @@ start:
     mov si, msg_hello
     call print_string
     
-    ; --- IVT Code Start ---
-    ; Hook interrupt 0x00 (Divide by Zero)
-    cli
-    xor ax, ax
-    mov es, ax
+    ; --- Disk Read Code Start ---
+    mov si, msg_reading_disk
+    call print_string
+
+    ; Read 1 sector from disk
+    mov ah, 0x02        ; BIOS read sector function
+    mov al, 1           ; Read 1 sector
+    mov ch, 0           ; Cylinder 0
+    mov dh, 0           ; Head 0
+    mov cl, 2           ; Sector 2 (1-based, 1 is bootloader)
+    mov dl, [boot_drive] ; Drive number
+    mov bx, 0x9000      ; Buffer address (ES:BX = 0:0x9000)
+    int 0x13            ; Call BIOS disk interrupt
     
-    ; Store Offset (address of handler)
-    mov word [es:0x00*4], handle_isr0
+    jc disk_error       ; Jump if Carry Flag set (error)
     
-    ; Store Segment (0x0000)
-    mov word [es:0x00*4+2], 0x0000
-    
-    sti
-    
-    ; Trigger Divide by Zero
-    mov si, msg_trigger_zero
+    mov si, msg_disk_success
     call print_string
     
-    xor ax, ax      ; Clear AX
-    mov ax, 10      ; AX = 10
-    mov bx, 0       ; BX = 0
-    div bx          ; 10 / 0 -> Triggers Int 0
+    ; Print loaded content
+    mov si, 0x9000      ; Point SI to buffer
+    call print_string   ; Print what we read
     
-    ; Note: Control flow might not return here if the handler doesn't handle the return address pointer adjustment carefully,
-    ; but for a simple test, we just want to see the print.
-    ; Real mode 'div' fault pushes CS:IP pointing to the instruction that caused the fault, so 'iret' would retry it (infinite loop).
-    ; We'll just halt in the handler or print and halt.
-
-    ; --- IVT Code End ---
-
-    ; Halt the system
     jmp $
 
-; interrupt 0x44 handler
-; interrupt 0x00 handler (Divide by Zero)
-handle_isr0:
-    pusha
-    mov si, msg_zero_caught
+disk_error:
+    mov si, msg_disk_error
     call print_string
-    popa
-    ; In real mode, divide error fault IP points to the instruction that caused it.
-    ; If we iret, it will re-execute 'div' and fault again (infinite loop).
-    ; We will just halt here to prove we caught it.
-    mov si, msg_halting
-    call print_string
-    cli
-    hlt
+    jmp $
+    
+    ; --- Disk Read Code End ---
 
 ; Function: init_serial
 ; Initialize COM1 for serial output
@@ -152,9 +139,10 @@ print_string:
 ; Data section
 msg_hello: db 'VibeKernel-x86 Bootloader', 0x0D, 0x0A
            db 'Hello World from Real Mode!', 0x0D, 0x0A, 0
-msg_trigger_zero: db 'Triggering Divide by Zero...', 0x0D, 0x0A, 0
-msg_zero_caught: db 'Divide by Zero Exception Caught!', 0x0D, 0x0A, 0
-msg_halting: db 'Halting System.', 0x0D, 0x0A, 0
+msg_reading_disk: db 'Reading Sector 2 from Disk...', 0x0D, 0x0A, 0
+msg_disk_success: db 'Disk Read Successful!', 0x0D, 0x0A, 'Content:', 0x0D, 0x0A, 0
+msg_disk_error:   db 'Disk Read Failed!', 0x0D, 0x0A, 0
+boot_drive: db 0
 
 ; Padding and boot signature
 times 510-($-$$) db 0   ; Pad with zeros to byte 510

@@ -1,1 +1,4 @@
 
+Hello from the Hard Disk!
+This text was loaded from Sector 2.
+VibeKernel is growing!

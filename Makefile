@@ -13,11 +13,13 @@ BIN_DIR = bin
 # Files
 BOOTLOADER = $(BOOT_DIR)/boot.asm
 BOOTLOADER_BIN = $(BIN_DIR)/boot.bin
+OS_IMAGE = $(BIN_DIR)/os-image.bin
+DATA_FILE = hei.txt
 
 # Targets
 .PHONY: all clean run debug
 
-all: $(BOOTLOADER_BIN)
+all: $(OS_IMAGE)
 
 # Create bin directory if it doesn't exist
 $(BIN_DIR):
@@ -26,16 +28,22 @@ $(BIN_DIR):
 # Assemble bootloader
 $(BOOTLOADER_BIN): $(BOOTLOADER) | $(BIN_DIR)
 	$(ASM) -f bin $(BOOTLOADER) -o $(BOOTLOADER_BIN)
-	@echo "Bootloader built successfully!"
-	@ls -lh $(BOOTLOADER_BIN)
+
+# Create OS image (bootloader + data + padding)
+$(OS_IMAGE): $(BOOTLOADER_BIN) $(DATA_FILE)
+	cat $(BOOTLOADER_BIN) $(DATA_FILE) > $(OS_IMAGE)
+	# Pad to ensure we have full sectors if needed, but for raw image it's fine.
+	# Actually, to make it clean, let's pad hei.txt or just ensure qemu reads it.
+	@echo "OS Image built successfully!"
+	@ls -lh $(OS_IMAGE)
 
 # Run in QEMU
-run: $(BOOTLOADER_BIN)
-	$(QEMU) -drive format=raw,file=$(BOOTLOADER_BIN) -monitor stdio
+run: $(OS_IMAGE)
+	$(QEMU) -drive format=raw,file=$(OS_IMAGE) -monitor stdio
 
 # Run in QEMU with debugging
-debug: $(BOOTLOADER_BIN)
-	$(QEMU) -drive format=raw,file=$(BOOTLOADER_BIN) -s -S &
+debug: $(OS_IMAGE)
+	$(QEMU) -drive format=raw,file=$(OS_IMAGE) -s -S &
 	gdb -ex "target remote localhost:1234" \
 	    -ex "set architecture i8086" \
 	    -ex "break *0x7c00" \
