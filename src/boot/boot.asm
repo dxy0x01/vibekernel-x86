@@ -5,8 +5,7 @@
 [ORG 0x7C00]        ; BIOS loads bootloader at address 0x7C00
 
 start:
-    ; Save boot drive number (passed in DL by BIOS)
-    mov [boot_drive], dl
+    ; BOOTLOADER START
 
     ; Initialize segment registers
     xor ax, ax      ; Zero out AX
@@ -15,12 +14,12 @@ start:
     mov ss, ax      ; Set Stack Segment to 0
     mov sp, 0x7C00  ; Set Stack Pointer (grows downward from bootloader)
 
-    ; Clear screen
-    call clear_screen
-
     ; Print hello message
     mov si, msg_real_mode
     call print_string
+
+    ; Enable A20 Line
+    call enable_a20
 
     ; Switch to Protected Mode
     call switch_to_pm
@@ -28,6 +27,7 @@ start:
     jmp $
 
 ; Include helper files
+%include "a20.asm"
 %include "gdt.asm"
 %include "print_string_pm.asm"
 %include "switch_pm.asm"
@@ -40,16 +40,6 @@ BEGIN_PM:
     
     jmp $ ; Hang
 
-; Function: clear_screen
-; Clears the screen using BIOS interrupt
-clear_screen:
-    pusha           ; Save all registers
-    mov ah, 0x00    ; Set video mode function
-    mov al, 0x03    ; 80x25 text mode
-    int 0x10        ; Call BIOS video interrupt
-    popa            ; Restore all registers
-    ret
-
 ; Function: print_string
 ; Prints a null-terminated string using BIOS
 ; Input: SI = pointer to string
@@ -59,19 +49,18 @@ print_string:
 
 .loop:
     lodsb           ; Load byte at DS:SI into AL, increment SI
-    cmp al, 0       ; Check if null terminator
-    je .done        ; If zero, we're done
+    test al, al     ; Optimized check
+    jz .done
     int 0x10        ; Call BIOS interrupt to print character
-    jmp .loop       ; Continue loop
+    jmp .loop
 
 .done:
     popa            ; Restore all registers
     ret
 
 ; Data section
-msg_real_mode: db 'Started in 16-bit Real Mode', 0x0D, 0x0A, 0
-msg_prot_mode: db 'Successfully landed in 32-bit Protected Mode', 0
-boot_drive: db 0
+msg_real_mode: db '16-bit Real Mode', 0
+msg_prot_mode: db '32-bit Protected Mode', 0
 
 ; Padding and boot signature
 times 510-($-$$) db 0   ; Pad with zeros to byte 510
