@@ -11,6 +11,29 @@ struct task* task_head = NULL;
 int task_init(struct task* task, struct process* process) {
     memset(task, 0, sizeof(struct task));
     task->process = process;
+
+    // Allocate User Stack (16KB)
+    task->user_stack = kmalloc(16384);
+    if (!task->user_stack) return -1;
+
+    memset(task->user_stack, 0, 16384);
+
+    // Allocate Kernel Stack (16KB)
+    task->kstack = kmalloc(16384);
+    if (!task->kstack) {
+        kfree(task->user_stack);
+        return -1;
+    }
+    memset(task->kstack, 0, 16384);
+
+    uint32_t stack_top = (uint32_t)task->user_stack + 16383;
+    
+    // Initialize registers for User Mode
+    task->regs.ss = 0x23; // User Data (0x20 | 3)
+    task->regs.esp = stack_top;
+    task->regs.cs = 0x1B; // User Code (0x18 | 3)
+    task->regs.eflags = 0x202; // IF | Reserved
+    
     return 0;
 }
 
@@ -41,12 +64,20 @@ struct task* task_current() {
 }
 
 void task_free(struct task* task) {
-    // Basic cleanup logic (to be expanded)
     if (task->prev) task->prev->next = task->next;
     if (task->next) task->next->prev = task->prev;
     if (task == task_head) task_head = task->next;
     if (task == task_tail) task_tail = task->prev;
     if (task == current_task) current_task = task_head;
     
+    if (task->user_stack) kfree(task->user_stack);
+    if (task->kstack) kfree(task->kstack);
     kfree(task);
+}
+
+extern tss_entry_t tss_entry;
+void task_switch(struct task* task) {
+    current_task = task;
+    tss_entry.esp0 = (uint32_t)task->kstack + 16383;
+    task_return(&task->regs);
 }

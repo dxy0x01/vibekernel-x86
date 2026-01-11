@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "../memory/paging/paging.h"
+#include "../cpu/gdt.h"
 
 struct registers {
     uint32_t edi;
@@ -27,10 +28,14 @@ struct task {
     struct process* process;
     struct task* next;
     struct task* prev;
+    void* user_stack;
+    void* kstack;
 };
 
 struct task* task_new(struct process* process);
 struct task* task_current();
 void task_free(struct task* task);
+void task_return(struct registers* regs);
+void task_switch(struct task* task);
 
 #endif

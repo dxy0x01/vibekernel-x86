@@ -121,6 +121,12 @@ void kernel_tests() {
     }
 }
 
+void user_test_app() {
+    // This should trigger a GPF because hlt is privileged
+    __asm__ __volatile__("hlt");
+    while(1);
+}
+
 void main() {
     gdt_init();
     serial_init();
@@ -140,39 +146,19 @@ void main() {
     kernel_tests();
 
     // Testing Process foundations
-    serial_print("Testing Process Foundations...\n");
-    print_string("Discovering Processes...\n");
-    struct process* p1 = NULL;
-    struct process* p2 = NULL;
-    struct process* p3 = NULL;
-    
-    process_load("PROC1", &p1);
-    process_load("PROC2", &p2);
-    process_load("PROC3", &p3);
+    serial_print("Testing User Land Functionality...\n");
+    print_string("Entering User Mode...\n");
 
-    // Iterate through process list
-    extern struct process* process_head;
-    struct process* cur = process_head;
-    while (cur) {
-        serial_print("Found Process: ");
-        serial_print(cur->name);
-        serial_print(" (PID: ");
-        serial_putc(cur->id + '0');
-        serial_print(")\n");
+    struct process* p_user = NULL;
+    process_load("USERAPP", &p_user);
 
-        print_string(" - ");
-        print_string(cur->name);
-        print_string(" [PID: ");
-        char pid_str[2] = {cur->id + '0', 0};
-        print_string(pid_str);
-        print_string("]\n");
+    struct task* t_user = task_new(p_user);
+    t_user->regs.eip = (uint32_t)user_test_app;
 
-        cur = cur->next;
-    }
+    task_switch(t_user);
 
-    serial_print("Kernel execution finished. Testing panic...\n");
-    print_string("\nKernel Finished. Halting...\n");
-    panic("SYSTEM STOPPED MANUALLY");
+    serial_print("This should never be reached!\n");
+    panic("USER LAND RETURN ERROR");
 
     while(1);
 }

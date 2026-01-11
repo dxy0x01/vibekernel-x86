@@ -46,6 +46,8 @@ PANIC_C = $(KERNEL_DIR)/panic.c
 PANIC_OBJ = $(BIN_DIR)/panic.o
 TASK_C = $(SRC_DIR)/task/task.c
 TASK_OBJ = $(BIN_DIR)/task.o
+TASK_ASM = $(SRC_DIR)/task/task.asm
+TASK_ASM_OBJ = $(BIN_DIR)/task_asm.o
 PROCESS_C = $(SRC_DIR)/task/process.c
 PROCESS_OBJ = $(BIN_DIR)/process.o
 GDT_C = $(CPU_DIR)/gdt.c
@@ -146,6 +148,9 @@ $(PANIC_OBJ): $(PANIC_C) | $(BIN_DIR)
 $(TASK_OBJ): $(TASK_C) | $(BIN_DIR)
 	$(CC) $(CFLAGS) $(TASK_C) -o $(TASK_OBJ)
 
+$(TASK_ASM_OBJ): $(TASK_ASM) | $(BIN_DIR)
+	$(ASM) -f elf $(TASK_ASM) -o $(TASK_ASM_OBJ)
+
 $(PROCESS_OBJ): $(PROCESS_C) | $(BIN_DIR)
 	$(CC) $(CFLAGS) $(PROCESS_C) -o $(PROCESS_OBJ)
 
@@ -153,8 +158,8 @@ $(GDT_ASM_OBJ): $(GDT_ASM) | $(BIN_DIR)
 	$(ASM) -f elf $(GDT_ASM) -o $(GDT_ASM_OBJ)
 
 # Link kernel
-$(KERNEL_BIN): $(KERNEL_ENTRY_OBJ) $(GDT_ASM_OBJ) $(GDT_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(PORTS_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ) $(BIN_DIR)/kheap.o $(BIN_DIR)/paging.o $(BIN_DIR)/serial.o $(BIN_DIR)/ata.o $(DISK_STREAM_OBJ) $(BIN_DIR)/string.o $(BIN_DIR)/path_parser.o $(FAT16_OBJ) $(VFS_OBJ) $(PANIC_OBJ) $(TASK_OBJ) $(PROCESS_OBJ) linker.ld
-	$(LD) $(LDFLAGS) -o $(KERNEL_BIN) $(KERNEL_ENTRY_OBJ) $(GDT_ASM_OBJ) $(GDT_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(PORTS_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ) $(BIN_DIR)/kheap.o $(BIN_DIR)/paging.o $(BIN_DIR)/serial.o $(BIN_DIR)/ata.o $(DISK_STREAM_OBJ) $(BIN_DIR)/string.o $(BIN_DIR)/path_parser.o $(FAT16_OBJ) $(VFS_OBJ) $(PANIC_OBJ) $(TASK_OBJ) $(PROCESS_OBJ)
+$(KERNEL_BIN): $(KERNEL_ENTRY_OBJ) $(GDT_ASM_OBJ) $(GDT_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(PORTS_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ) $(BIN_DIR)/kheap.o $(BIN_DIR)/paging.o $(BIN_DIR)/serial.o $(BIN_DIR)/ata.o $(DISK_STREAM_OBJ) $(BIN_DIR)/string.o $(BIN_DIR)/path_parser.o $(FAT16_OBJ) $(VFS_OBJ) $(PANIC_OBJ) $(TASK_OBJ) $(TASK_ASM_OBJ) $(PROCESS_OBJ) linker.ld
+	$(LD) $(LDFLAGS) -o $(KERNEL_BIN) $(KERNEL_ENTRY_OBJ) $(GDT_ASM_OBJ) $(GDT_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(PORTS_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ) $(BIN_DIR)/kheap.o $(BIN_DIR)/paging.o $(BIN_DIR)/serial.o $(BIN_DIR)/ata.o $(DISK_STREAM_OBJ) $(BIN_DIR)/string.o $(BIN_DIR)/path_parser.o $(FAT16_OBJ) $(VFS_OBJ) $(PANIC_OBJ) $(TASK_OBJ) $(TASK_ASM_OBJ) $(PROCESS_OBJ)
 
 # Create OS image (bootloader + kernel)
 $(OS_IMAGE): $(BOOTLOADER_BIN) $(KERNEL_BIN)
