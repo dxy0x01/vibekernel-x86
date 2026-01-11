@@ -33,6 +33,7 @@ int task_init(struct task* task, struct process* process) {
     task->regs.ss = 0x23; // User Data (0x20 | 3)
     task->regs.esp = stack_top;
     task->regs.cs = 0x1B; // User Code (0x18 | 3)
+    task->regs.eip = (uint32_t)process->ptr;
     task->regs.eflags = 0x202; // IF | Reserved
 
     // Map user stack in the process's page directory

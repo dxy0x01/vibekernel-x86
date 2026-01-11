@@ -42,6 +42,46 @@ void echo_handler(int argc, char** argv) {
     print_string("\n");
 }
 
+void run_handler(int argc, char** argv) {
+    if (argc < 2) {
+        print_string("Usage: run <filename>\n");
+        return;
+    }
+
+    struct process* process = NULL;
+    if (process_load(argv[1], &process) < 0) {
+        print_string("Failed to load process: ");
+        print_string(argv[1]);
+        print_string("\n");
+        return;
+    }
+
+    struct task* task = task_new(process);
+    if (!task) {
+        print_string("Failed to create task\n");
+        return;
+    }
+
+    print_string("Starting process: ");
+    print_string(argv[1]);
+    print_string("\n");
+
+    task_switch(task);
+}
+
+void ls_handler(int argc, char** argv) {
+    const char* path = "0:/";
+    if (argc > 1) {
+        path = argv[1];
+    }
+
+    if (fs_list(path) != 0) {
+        print_string("ls: Failed to list directory: ");
+        print_string(path);
+        print_string("\n");
+    }
+}
+
 void print_handler(int argc, char** argv) {
     for (int i = 1; i < argc; i++) {
         print_string(argv[i]);
@@ -77,6 +117,8 @@ void main() {
     command_register("version", "Display kernel version", version_handler);
     command_register("echo", "Print arguments to the screen", echo_handler);
     command_register("print", "Display text on the screen", print_handler);
+    command_register("run", "Execute a binary or ELF file", run_handler);
+    command_register("ls", "List directory contents", ls_handler);
 
     char echo_msg[] = "echo VibeKernel is ready.";
     command_run(echo_msg);

@@ -39,22 +39,37 @@ out:
 
 #include "../fs/file.h"
 
+#include "../loader/elf.h"
+
 int process_load(const char* filename, struct process** process) {
     int res = 0;
-    struct process* proc = NULL;
+    int fd = fopen(filename, "r");
+    if (fd < 0) return -1;
 
+    uint32_t magic = 0;
+    if (fread(&magic, 4, 1, fd) != 1) {
+        fclose(fd);
+        return -1;
+    }
+    fclose(fd);
+
+    if (magic == 0x464C457F) { // .ELF in little endian
+        return elf_load(filename, process);
+    }
+
+    // Raw binary loading fallback
+    struct process* proc = NULL;
     res = process_alloc(&proc);
     if (res < 0) goto out;
 
     strcpy(proc->name, filename);
     
-    // Open the binary file
-    int fd = fopen(filename, "r");
+    fd = fopen(filename, "r");
     if (fd < 0) {
         res = -1;
         goto out;
     }
-
+    // ... (rest of raw loading logic)
     struct file_stat stat;
     if (fstat(fd, &stat) != 0) {
         res = -1;
@@ -82,22 +97,17 @@ int process_load(const char* filename, struct process** process) {
         goto out;
     }
 
-    // Map user binary to 0x400000
-    // We map it page by page
     for (int i = 0; i < proc->size; i += PAGING_PAGE_SIZE) {
         uint32_t val = ((uint32_t)proc->ptr + i) | PAGING_IS_PRESENT | PAGING_IS_WRITEABLE | PAGING_ACCESS_FROM_ALL;
         paging_set(proc->paging_chunk->directory_entry, (void*)(0x400000 + i), val);
     }
 
-    // Map VGA memory for verification (0xB8000)
     paging_set(proc->paging_chunk->directory_entry, (void*)0xB8000, 0xB8000 | PAGING_IS_PRESENT | PAGING_IS_WRITEABLE | PAGING_ACCESS_FROM_ALL);
 
+    proc->ptr = (void*)0x400000;
     *process = proc;
 
 out:
-    if (res < 0 && proc) {
-        process_free(proc);
-    }
     return res;
 }
 

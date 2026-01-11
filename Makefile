@@ -14,6 +14,7 @@ LDFLAGS = -m elf_i386 -T linker.ld --oformat binary
 SRC_DIR = src
 BOOT_DIR = $(SRC_DIR)/boot
 KERNEL_DIR = $(SRC_DIR)/kernel
+PROGRAMS_DIR = programs
 DRIVERS_DIR = $(SRC_DIR)/drivers
 CPU_DIR = $(SRC_DIR)/cpu
 MEMORY_DIR = $(SRC_DIR)/memory
@@ -56,9 +57,11 @@ GDT_ASM = $(CPU_DIR)/gdt.asm
 GDT_ASM_OBJ = $(BIN_DIR)/gdt_asm.o
 KEYBOARD_OBJ = $(BIN_DIR)/keyboard.o
 PS2_OBJ = $(BIN_DIR)/ps2.o
+ELF_OBJ = $(BIN_DIR)/elf.o
 COMMAND_OBJ = $(BIN_DIR)/command.o
 KERNEL_BIN = $(BIN_DIR)/kernel.bin
 OS_IMAGE = $(BIN_DIR)/os-image.bin
+TEST_ELF = $(BIN_DIR)/test_elf.elf
 
 # Targets
 .PHONY: all clean run debug
@@ -110,6 +113,9 @@ $(KEYBOARD_OBJ): $(DRIVERS_DIR)/keyboard.c | $(BIN_DIR)
 
 $(PS2_OBJ): $(DRIVERS_DIR)/ps2.c | $(BIN_DIR)
 	$(CC) $(CFLAGS) $(DRIVERS_DIR)/ps2.c -o $(PS2_OBJ)
+
+$(ELF_OBJ): $(SRC_DIR)/loader/elf.c | $(BIN_DIR)
+	$(CC) $(CFLAGS) $(SRC_DIR)/loader/elf.c -o $(ELF_OBJ)
 
 # Compile ATA Driver
 $(BIN_DIR)/ata.o: $(DRIVERS_DIR)/ata.c | $(BIN_DIR)
@@ -170,8 +176,8 @@ $(GDT_ASM_OBJ): $(GDT_ASM) | $(BIN_DIR)
 	$(ASM) -f elf $(GDT_ASM) -o $(GDT_ASM_OBJ)
 
 # Link kernel
-$(KERNEL_BIN): $(KERNEL_ENTRY_OBJ) $(GDT_ASM_OBJ) $(GDT_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(PORTS_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ) $(BIN_DIR)/kheap.o $(BIN_DIR)/paging.o $(BIN_DIR)/serial.o $(BIN_DIR)/ata.o $(DISK_STREAM_OBJ) $(BIN_DIR)/string.o $(BIN_DIR)/path_parser.o $(FAT16_OBJ) $(VFS_OBJ) $(PANIC_OBJ) $(TASK_OBJ) $(TASK_ASM_OBJ) $(PROCESS_OBJ) $(KEYBOARD_OBJ) $(PS2_OBJ) $(COMMAND_OBJ) linker.ld
-	$(LD) $(LDFLAGS) -o $(KERNEL_BIN) $(KERNEL_ENTRY_OBJ) $(GDT_ASM_OBJ) $(GDT_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(PORTS_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ) $(BIN_DIR)/kheap.o $(BIN_DIR)/paging.o $(BIN_DIR)/serial.o $(BIN_DIR)/ata.o $(DISK_STREAM_OBJ) $(BIN_DIR)/string.o $(BIN_DIR)/path_parser.o $(FAT16_OBJ) $(VFS_OBJ) $(PANIC_OBJ) $(TASK_OBJ) $(TASK_ASM_OBJ) $(PROCESS_OBJ) $(KEYBOARD_OBJ) $(PS2_OBJ) $(COMMAND_OBJ)
+$(KERNEL_BIN): $(KERNEL_ENTRY_OBJ) $(GDT_ASM_OBJ) $(GDT_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(PORTS_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ) $(BIN_DIR)/kheap.o $(BIN_DIR)/paging.o $(BIN_DIR)/serial.o $(BIN_DIR)/ata.o $(DISK_STREAM_OBJ) $(BIN_DIR)/string.o $(BIN_DIR)/path_parser.o $(FAT16_OBJ) $(VFS_OBJ) $(PANIC_OBJ) $(TASK_OBJ) $(TASK_ASM_OBJ) $(PROCESS_OBJ) $(KEYBOARD_OBJ) $(PS2_OBJ) $(ELF_OBJ) $(COMMAND_OBJ) linker.ld
+	$(LD) $(LDFLAGS) -o $(KERNEL_BIN) $(KERNEL_ENTRY_OBJ) $(GDT_ASM_OBJ) $(GDT_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(PORTS_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ) $(BIN_DIR)/kheap.o $(BIN_DIR)/paging.o $(BIN_DIR)/serial.o $(BIN_DIR)/ata.o $(DISK_STREAM_OBJ) $(BIN_DIR)/string.o $(BIN_DIR)/path_parser.o $(FAT16_OBJ) $(VFS_OBJ) $(PANIC_OBJ) $(TASK_OBJ) $(TASK_ASM_OBJ) $(PROCESS_OBJ) $(KEYBOARD_OBJ) $(PS2_OBJ) $(ELF_OBJ) $(COMMAND_OBJ)
 
 # Create OS image (bootloader + kernel)
 $(OS_IMAGE): $(BOOTLOADER_BIN) $(KERNEL_BIN)
@@ -186,10 +192,15 @@ clean:
 	@echo "Cleaned build artifacts"
 
 # Create fat16 test image
-$(BIN_DIR)/fat16.img: $(BIN_DIR)/blank.bin | $(BIN_DIR)
+$(BIN_DIR)/fat16.img: $(BIN_DIR)/blank.bin $(TEST_ELF) | $(BIN_DIR)
 	dd if=/dev/zero of=$(BIN_DIR)/fat16.img bs=1M count=16
 	mkfs.fat -F 16 $(BIN_DIR)/fat16.img
 	python3 inject_file.py $(BIN_DIR)/fat16.img $(BIN_DIR)/blank.bin blank.bin
+	python3 inject_file.py $(BIN_DIR)/fat16.img $(TEST_ELF) test_elf.elf
+
+$(TEST_ELF): $(PROGRAMS_DIR)/test_elf/test_elf.asm | $(BIN_DIR)
+	$(ASM) -f elf $(PROGRAMS_DIR)/test_elf/test_elf.asm -o $(BIN_DIR)/test_elf_asm.o
+	$(LD) -m elf_i386 -Ttext 0x400000 $(BIN_DIR)/test_elf_asm.o -o $(TEST_ELF)
 
 $(BIN_DIR)/blank.bin: programs/blank/blank.asm | $(BIN_DIR)
 	$(ASM) -f bin programs/blank/blank.asm -o $(BIN_DIR)/blank.bin

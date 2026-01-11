@@ -37,6 +37,7 @@ typedef int (*FS_READ_FUNCTION)(struct disk* disk, void* private, uint32_t size,
 typedef int (*FS_SEEK_FUNCTION)(void* private, int offset, FILE_SEEK_MODE whence);
 typedef int (*FS_CLOSE_FUNCTION)(void* private);
 typedef int (*FS_TELL_FUNCTION)(void* private);
+typedef int (*FS_LIST_FUNCTION)(struct disk* disk, struct path_part* path);
 
 typedef uint32_t FILE_STAT_FLAGS;
 #define FILE_STAT_READ_ONLY 0x01
@@ -64,6 +65,7 @@ struct filesystem {
     FS_TELL_FUNCTION tell;
     FS_CLOSE_FUNCTION close;
     FS_STAT_FUNCTION stat;
+    FS_LIST_FUNCTION list;
 };
 
 void fs_init();
@@ -76,5 +78,6 @@ int fseek(int fd, int offset, FILE_SEEK_MODE whence);
 int ftell(int fd);
 int fstat(int fd, struct file_stat* stat);
 int fclose(int fd);
+int fs_list(const char* path);
 
 #endif

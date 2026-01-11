@@ -65,6 +65,30 @@ int tolower(int c)
     return c;
 }
 
+int toupper(int c)
+{
+    if (c >= 'a' && c <= 'z')
+    {
+        return c - 32;
+    }
+    return c;
+}
+
+int strncasecmp(const char *s1, const char *s2, size_t n)
+{
+    if (n == 0) return 0;
+    while (n-- > 0 && toupper((unsigned char)*s1) == toupper((unsigned char)*s2))
+    {
+        if (n == 0 || *s1 == '\0') {
+            if (toupper((unsigned char)*s1) == toupper((unsigned char)*s2)) return 0;
+            break;
+        }
+        s1++;
+        s2++;
+    }
+    return toupper((unsigned char)*s1) - toupper((unsigned char)*s2);
+}
+
 void* memcpy(void* dest, const void* src, size_t n)
 {
     char* d = dest;

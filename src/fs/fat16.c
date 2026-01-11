@@ -4,6 +4,7 @@
 #include "../drivers/disk_stream.h"
 #include "../memory/heap/kheap.h"
 #include "../string/string.h"
+#include "../drivers/screen.h"
 #include <stddef.h>
 
 void* fat16_open(struct disk* disk, struct path_part* path, FILE_MODE mode);
@@ -17,7 +18,8 @@ struct filesystem* fat16_init_vfs() {
         .seek = (FS_SEEK_FUNCTION)fat16_seek,
         .tell = (FS_TELL_FUNCTION)fat16_tell,
         .close = (FS_CLOSE_FUNCTION)fat16_close,
-        .stat = (FS_STAT_FUNCTION)fat16_stat
+        .stat = (FS_STAT_FUNCTION)fat16_stat,
+        .list = (FS_LIST_FUNCTION)fat16_list
     };
     return &fat16_fs;
 }
@@ -28,21 +30,21 @@ int fat16_get_total_items_for_directory(struct fat_directory_item* item) {
     return 0; // Not yet fully implemented for subdirs
 }
 
-static void fat16_to_proper_string(char** out, const char* in) {
-    while(*in != 0x00 && *in != 0x20) {
-        **out = *in;
+static void fat16_to_proper_string(char** out, const char* in, int limit) {
+    for (int i = 0; i < limit; i++) {
+        if (in[i] == 0x00 || in[i] == 0x20) break;
+        **out = in[i];
         *out += 1;
-        in += 1;
     }
 }
 
 void fat16_get_full_relative_filename(struct fat_directory_item* item, char* out, int max_len) {
     memset(out, 0x00, max_len);
     char* temp_out = out;
-    fat16_to_proper_string(&temp_out, (const char*)item->filename);
+    fat16_to_proper_string(&temp_out, (const char*)item->filename, 8);
     if (item->ext[0] != 0x00 && item->ext[0] != 0x20) {
         *temp_out++ = '.';
-        fat16_to_proper_string(&temp_out, (const char*)item->ext);
+        fat16_to_proper_string(&temp_out, (const char*)item->ext, 3);
     }
 }
 
@@ -114,7 +116,7 @@ static int fat16_get_directory_entry(struct disk* disk, uint32_t cluster, const 
             
             char out_name[13];
             fat16_get_full_relative_filename(&item, out_name, sizeof(out_name));
-            if (strncmp(out_name, name, sizeof(out_name)) == 0) {
+            if (strncasecmp(out_name, name, sizeof(out_name)) == 0) {
                 *out_item = item;
                 return 0;
             }
@@ -135,7 +137,7 @@ static int fat16_get_directory_entry(struct disk* disk, uint32_t cluster, const 
                 
                 char out_name[13];
                 fat16_get_full_relative_filename(&item, out_name, sizeof(out_name));
-                if (strncmp(out_name, name, sizeof(out_name)) == 0) {
+                if (strncasecmp(out_name, name, sizeof(out_name)) == 0) {
                     *out_item = item;
                     return 0;
                 }
@@ -145,6 +147,61 @@ static int fat16_get_directory_entry(struct disk* disk, uint32_t cluster, const 
     }
     
     return -4; // Not found
+}
+
+int fat16_list(struct disk* disk, struct path_part* path) {
+    struct fat_private* private = disk->fs_private;
+    uint32_t bytes_per_sector = private->bpb.bytes_per_sector;
+    uint32_t root_dir_entries = private->bpb.root_dir_entries;
+    uint32_t current_cluster = 0;
+
+    struct path_part* current_part = path;
+    while (current_part) {
+        struct fat_directory_item item;
+        if (fat16_get_directory_entry(disk, current_cluster, current_part->part, &item) != 0) {
+            return -1;
+        }
+        if (!(item.attribute & FAT_FILE_SUBDIRECTORY)) return -1;
+        current_cluster = item.low_16_bits_first_cluster;
+        current_part = current_part->next;
+    }
+
+    if (current_cluster == 0) {
+         uint32_t root_dir_sector = fat16_get_root_directory_sector(disk);
+         diskstream_seek(private->stream, root_dir_sector * bytes_per_sector);
+         for (int i = 0; i < root_dir_entries; i++) {
+             struct fat_directory_item item;
+             if (diskstream_read(private->stream, &item, sizeof(item)) != 0) break;
+             if (item.filename[0] == 0x00) break;
+             if (item.filename[0] == 0xE5) continue;
+             
+             char out_name[13];
+             fat16_get_full_relative_filename(&item, out_name, sizeof(out_name));
+             print_string(out_name);
+             if (item.attribute & FAT_FILE_SUBDIRECTORY) print_string("/");
+             print_string("\n");
+         }
+    } else {
+        uint32_t cluster_size = private->bpb.sectors_per_cluster * bytes_per_sector;
+        while (current_cluster < FAT16_CLUSTER_RESERVED_MIN) {
+            uint32_t abs_sector = fat16_cluster_to_sector(disk, current_cluster);
+            diskstream_seek(private->stream, abs_sector * bytes_per_sector);
+            for (uint32_t i = 0; i < cluster_size / sizeof(struct fat_directory_item); i++) {
+                struct fat_directory_item item;
+                if (diskstream_read(private->stream, &item, sizeof(item)) != 0) break;
+                if (item.filename[0] == 0x00) break;
+                if (item.filename[0] == 0xE5) continue;
+                
+                char out_name[13];
+                fat16_get_full_relative_filename(&item, out_name, sizeof(out_name));
+                print_string(out_name);
+                if (item.attribute & FAT_FILE_SUBDIRECTORY) print_string("/");
+                print_string("\n");
+            }
+            current_cluster = fat16_get_fat_entry(disk, current_cluster);
+        }
+    }
+    return 0;
 }
 
 // legacy fat16_open removed

@@ -160,3 +160,25 @@ int fclose(int fd) {
     }
     return res;
 }
+
+int fs_list(const char* path) {
+    struct path_root* root_path = path_parser_parse(path, NULL);
+    if (!root_path) return -1;
+
+    int drive_no = root_path->drive_no;
+    if (drive_no < 0 || drive_no > 1) {
+        path_parser_free(root_path);
+        return -2;
+    }
+
+    struct disk* disk = &disks[drive_no];
+    struct filesystem* fs = fs_resolve(disk);
+    if (!fs || !fs->list) {
+        path_parser_free(root_path);
+        return -3;
+    }
+
+    int res = fs->list(disk, root_path->first);
+    path_parser_free(root_path);
+    return res;
+}

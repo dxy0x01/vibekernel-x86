@@ -93,6 +93,7 @@ int fat16_seek(void* private, int offset, FILE_SEEK_MODE whence);
 int fat16_tell(void* private);
 int fat16_close(void* private);
 int fat16_stat(struct disk* disk, void* private, struct file_stat* stat);
+int fat16_list(struct disk* disk, struct path_part* path);
 
 // For Testing
 uint32_t fat16_cluster_to_sector(struct disk* disk, uint32_t cluster);
