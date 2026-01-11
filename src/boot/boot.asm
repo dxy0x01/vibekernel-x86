@@ -2,21 +2,29 @@
 ; Simple "Hello World" bootloader that runs in 16-bit real mode
 
 [BITS 16]           ; Tell NASM we're in 16-bit real mode
-[ORG 0x7C00]        ; BIOS loads bootloader at address 0x7C00
+[ORG 0x7C00]
+KERNEL_OFFSET equ 0x1000 ; Memory offset to which we will load our kernel
 
 start:
     ; BOOTLOADER START
+    mov [boot_drive], dl ; Save boot drive
 
     ; Initialize segment registers
-    xor ax, ax      ; Zero out AX
-    mov ds, ax      ; Set Data Segment to 0
-    mov es, ax      ; Set Extra Segment to 0
-    mov ss, ax      ; Set Stack Segment to 0
-    mov sp, 0x7C00  ; Set Stack Pointer (grows downward from bootloader)
+    xor ax, ax
+    mov ds, ax
+    mov es, ax
+    mov ss, ax
+    mov sp, 0x7C00
 
     ; Print hello message
     mov si, msg_real_mode
     call print_string
+
+    ; Load Kernel
+    mov bx, KERNEL_OFFSET ; Read from disk and store in 0x1000
+    mov dh, 15 ; Load 15 sectors (plenty of space)
+    mov dl, [boot_drive]
+    call disk_load
 
     ; Enable A20 Line
     call enable_a20
@@ -28,6 +36,7 @@ start:
 
 ; Include helper files
 %include "a20.asm"
+%include "disk.asm"
 %include "gdt.asm"
 %include "print_string_pm.asm"
 %include "switch_pm.asm"
@@ -36,7 +45,9 @@ start:
 ; This is where we arrive after switching to and initializing protected mode
 BEGIN_PM:
     mov ebx, msg_prot_mode
-    call print_string_pm    ; Use our 32-bit print function
+    call print_string_pm    
+    
+    call KERNEL_OFFSET ; Jump to the loaded kernel code
     
     jmp $ ; Hang
 
@@ -61,6 +72,7 @@ print_string:
 ; Data section
 msg_real_mode: db '16-bit Real Mode', 0
 msg_prot_mode: db '32-bit Protected Mode', 0
+boot_drive: db 0
 
 ; Padding and boot signature
 times 510-($-$$) db 0   ; Pad with zeros to byte 510
