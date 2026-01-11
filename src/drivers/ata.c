@@ -55,11 +55,11 @@ int ata_identify() {
     return 0;
 }
 
-int ata_read_sector(uint32_t lba, uint16_t* buffer) {
+int ata_read_sector(int drive, uint32_t lba, uint16_t* buffer) {
     ata_wait_bsy();
 
-    // 0xE0 = LBA Mode & Master. | with bits 24-27 of LBA
-    port_byte_out(ATA_PRIMARY_DRIVE_SEL, 0xE0 | ((lba >> 24) & 0x0F));
+    uint8_t drive_bit = (drive == 0) ? 0x00 : 0x10;
+    port_byte_out(ATA_PRIMARY_DRIVE_SEL, 0xE0 | drive_bit | ((lba >> 24) & 0x0F));
     port_byte_out(ATA_PRIMARY_SEC_COUNT, 1);
     port_byte_out(ATA_PRIMARY_LBA_LOW, (uint8_t)lba);
     port_byte_out(ATA_PRIMARY_LBA_MID, (uint8_t)(lba >> 8));
@@ -77,10 +77,11 @@ int ata_read_sector(uint32_t lba, uint16_t* buffer) {
     return 0;
 }
 
-int ata_write_sector(uint32_t lba, uint16_t* buffer) {
+int ata_write_sector(int drive, uint32_t lba, uint16_t* buffer) {
     ata_wait_bsy();
 
-    port_byte_out(ATA_PRIMARY_DRIVE_SEL, 0xE0 | ((lba >> 24) & 0x0F));
+    uint8_t drive_bit = (drive == 0) ? 0x00 : 0x10;
+    port_byte_out(ATA_PRIMARY_DRIVE_SEL, 0xE0 | drive_bit | ((lba >> 24) & 0x0F));
     port_byte_out(ATA_PRIMARY_SEC_COUNT, 1);
     port_byte_out(ATA_PRIMARY_LBA_LOW, (uint8_t)lba);
     port_byte_out(ATA_PRIMARY_LBA_MID, (uint8_t)(lba >> 8));

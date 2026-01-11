@@ -27,7 +27,7 @@ int diskstream_read(struct disk_stream* stream, void* out, uint32_t total)
     while(total_to_read > 0)
     {
         uint16_t buffer[256];
-        if (ata_read_sector(sector, buffer) != 0)
+        if (ata_read_sector(stream->disk_id, sector, buffer) != 0)
         {
             return -1;
         }

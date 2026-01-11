@@ -9,8 +9,10 @@
 #include "../memory/paging/paging.h"
 
 #include "../cpu/gdt.h"
+#include "../string/string.h"
 
 #include "../drivers/disk_stream.h"
+#include "../fs/fat16.h"
 
 // Simulate idt_init if it doesn't match exactly yet
 void idt_init() {
@@ -102,7 +104,7 @@ void main() {
     // Write pattern to Sector 2 using raw ATA first
     uint16_t* write_buf = (uint16_t*)kmalloc(512);
     for(int i=0; i<256; i++) write_buf[i] = 0x55AA; // Swap pattern for variety
-    ata_write_sector(2, write_buf);
+    ata_write_sector(0, 2, write_buf);
 
     struct disk_stream* stream = diskstream_new(0);
     diskstream_seek(stream, 512 * 2); // Seek to Sector 2
@@ -147,6 +149,66 @@ void main() {
         serial_print("Freeing Success.\n");
     } else {
         serial_print("Path parsing FAILED!\n");
+    }
+
+    // Test FAT16
+    serial_print("Testing FAT16 Filesystem on Drive 1...\n");
+    int fat_res = fat16_init(1);
+    if (fat_res == 0) {
+        serial_print("FAT16 Initialized Successfully!\n");
+        
+        // --- End-to-End Verification: Manual File Injection ---
+        serial_print("Injecting 'TEST.TXT' into Drive 1 root directory...\n");
+        
+        uint32_t root_sec = fat16_get_root_directory_sector();
+        uint16_t* root_buf = (uint16_t*)kmalloc(512);
+        
+        // Read current root directory (to preserve other entries if any, though it's likely empty)
+        ata_read_sector(1, root_sec, root_buf);
+        
+        struct fat_directory_item* entry = (struct fat_directory_item*)root_buf;
+        memcpy(entry->filename, "TEST    ", 8);
+        memcpy(entry->ext, "TXT", 3);
+        entry->attribute = 0x20;
+        entry->low_16_bits_first_cluster = 2;
+        entry->filesize = 14; 
+        
+        // Write back the root directory sector
+        ata_write_sector(1, root_sec, root_buf);
+        
+        // Prepare data for cluster 2
+        uint32_t data_sec = fat16_cluster_to_sector(2);
+        uint16_t* data_buf = (uint16_t*)kmalloc(512);
+        memset(data_buf, 0, 512);
+        memcpy(data_buf, "Hello FAT16!\n", 14);
+        
+        // Write data to Drive 1
+        ata_write_sector(1, data_sec, data_buf);
+        
+        serial_print("Injection complete. Attempting to open TEST.TXT...\n");
+        
+        struct fat_file_descriptor* fd = fat16_open("TEST.TXT");
+        if (fd) {
+            serial_print("TEST.TXT opened successfully!\n");
+            char read_back[16];
+            memset(read_back, 0, 16);
+            int read_res = fat16_read(fd, 1, 14, read_back);
+            if (read_res == 14) {
+                serial_print("File contents: ");
+                serial_print(read_back);
+            } else {
+                serial_print("Read FAILED!\n");
+            }
+            fat16_close(fd);
+        } else {
+            serial_print("Failed to open TEST.TXT!\n");
+        }
+    } else {
+        serial_print("FAT16 Initialization FAILED! Code: ");
+        if (fat_res < 0) serial_putc('-');
+        uint32_t val = (fat_res < 0) ? -fat_res : fat_res;
+        serial_putc(val + '0');
+        serial_print("\n");
     }
 
     serial_print("Kernel execution finished. Hanging system...\n");

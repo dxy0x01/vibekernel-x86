@@ -25,3 +25,53 @@ char* strchr(const char* str, int c) {
     }
     return (char*)str;
 }
+
+void* memset(void* ptr, int c, size_t size)
+{
+    char* c_ptr = (char*)ptr;
+    for (size_t i = 0; i < size; i++)
+    {
+        c_ptr[i] = (char)c;
+    }
+    return ptr;
+}
+
+int strncmp(const char* str1, const char* str2, size_t n)
+{
+    unsigned char u1, u2;
+    while (n > 0)
+    {
+        u1 = (unsigned char)*str1++;
+        u2 = (unsigned char)*str2++;
+        if (u1 != u2)
+        {
+            return u1 - u2;
+        }
+        if (u1 == '\0')
+        {
+            return 0;
+        }
+        n--;
+    }
+    return 0;
+}
+
+int tolower(int c)
+{
+    if (c >= 'A' && c <= 'Z')
+    {
+        return c + 32;
+    }
+    return c;
+}
+
+void* memcpy(void* dest, const void* src, size_t n)
+{
+    char* d = dest;
+    const char* s = src;
+    while (n--)
+    {
+        *d++ = *s++;
+    }
+    return dest;
+}
