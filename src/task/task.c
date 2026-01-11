@@ -58,6 +58,7 @@ struct task* task_new(struct process* process) {
         task_head = task;
         task_tail = task;
         current_task = task;
+        process_switch(process);
     } else {
         task_tail->next = task;
         task->prev = task_tail;
@@ -86,6 +87,7 @@ void task_free(struct task* task) {
 extern tss_entry_t tss_entry;
 void task_switch(struct task* task) {
     current_task = task;
+    process_switch(task->process);
     paging_switch(task->process->paging_chunk->directory_entry);
     tss_entry.esp0 = (uint32_t)task->kstack + 16383;
     task_return(&task->regs);

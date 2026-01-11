@@ -5,6 +5,7 @@
 
 struct process* process_head = NULL;
 struct process* process_tail = NULL;
+static struct process* current_process = NULL;
 
 static int process_get_free_slot() {
     static int current_id = 0;
@@ -126,4 +127,13 @@ struct process* process_get(int process_id) {
         proc = proc->next;
     }
     return NULL;
+}
+
+struct process* process_current() {
+    return current_process;
+}
+
+int process_switch(struct process* process) {
+    current_process = process;
+    return 0;
 }

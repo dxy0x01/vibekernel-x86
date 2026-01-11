@@ -21,6 +21,7 @@ int process_alloc(struct process** process);
 int process_load(const char* filename, struct process** process);
 void process_free(struct process* process);
 struct process* process_get(int process_id);
+struct process* process_current();
 int process_switch(struct process* process);
 
 #endif
