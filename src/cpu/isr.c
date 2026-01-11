@@ -1,6 +1,7 @@
 #include "isr.h"
 #include "idt.h"
 #include "../drivers/screen.h"
+#include "../drivers/ports.h"
 
 // Declarations of external assembly symbols
 extern void isr0();
@@ -36,6 +37,41 @@ extern void isr29();
 extern void isr30();
 extern void isr31();
 
+// IRQs
+extern void irq0();
+extern void irq1();
+extern void irq2();
+extern void irq3();
+extern void irq4();
+extern void irq5();
+extern void irq6();
+extern void irq7();
+extern void irq8();
+extern void irq9();
+extern void irq10();
+extern void irq11();
+extern void irq12();
+extern void irq13();
+extern void irq14();
+extern void irq15();
+
+#define IRQ0 32
+#define IRQ1 33
+#define IRQ2 34
+#define IRQ3 35
+#define IRQ4 36
+#define IRQ5 37
+#define IRQ6 38
+#define IRQ7 39
+#define IRQ8 40
+#define IRQ9 41
+#define IRQ10 42
+#define IRQ11 43
+#define IRQ12 44
+#define IRQ13 45
+#define IRQ14 46
+#define IRQ15 47
+
 void isr_install() {
     set_idt_gate(0, (uint32_t)isr0);
     set_idt_gate(1, (uint32_t)isr1);
@@ -69,6 +105,36 @@ void isr_install() {
     set_idt_gate(29, (uint32_t)isr29);
     set_idt_gate(30, (uint32_t)isr30);
     set_idt_gate(31, (uint32_t)isr31);
+
+    // Remap the PIC
+    port_byte_out(0x20, 0x11);
+    port_byte_out(0xA0, 0x11);
+    port_byte_out(0x21, 0x20); // Master offset 0x20
+    port_byte_out(0xA1, 0x28); // Slave offset 0x28
+    port_byte_out(0x21, 0x04);
+    port_byte_out(0xA1, 0x02);
+    port_byte_out(0x21, 0x01);
+    port_byte_out(0xA1, 0x01);
+    port_byte_out(0x21, 0x0);
+    port_byte_out(0xA1, 0x0); 
+
+    // Install IRQs
+    set_idt_gate(32, (uint32_t)irq0);
+    set_idt_gate(33, (uint32_t)irq1);
+    set_idt_gate(34, (uint32_t)irq2);
+    set_idt_gate(35, (uint32_t)irq3);
+    set_idt_gate(36, (uint32_t)irq4);
+    set_idt_gate(37, (uint32_t)irq5);
+    set_idt_gate(38, (uint32_t)irq6);
+    set_idt_gate(39, (uint32_t)irq7);
+    set_idt_gate(40, (uint32_t)irq8);
+    set_idt_gate(41, (uint32_t)irq9);
+    set_idt_gate(42, (uint32_t)irq10);
+    set_idt_gate(43, (uint32_t)irq11);
+    set_idt_gate(44, (uint32_t)irq12);
+    set_idt_gate(45, (uint32_t)irq13);
+    set_idt_gate(46, (uint32_t)irq14);
+    set_idt_gate(47, (uint32_t)irq15);
 
     set_idt(); // Load IDT
 }
@@ -113,7 +179,22 @@ char *exception_messages[] = {
 };
 
 void isr_handler(registers_t r) {
-    print_string("received interrupt: ");
-    print_string(exception_messages[r.int_no]);
-    print_string("\n");
+    if (r.int_no < 32) {
+        print_string("received interrupt: ");
+        print_string(exception_messages[r.int_no]);
+        print_string("\n");
+        __asm__("cli; hlt"); // Halt on exception
+    }
+}
+
+void irq_handler(registers_t r) {
+    // Send EOI to PICs
+    if (r.int_no >= 40) port_byte_out(0xA0, 0x20); // Slave
+    port_byte_out(0x20, 0x20); // Master
+
+    /*
+    if (r.int_no == 32) {
+        print_string("Tick\n");
+    }
+    */
 }
