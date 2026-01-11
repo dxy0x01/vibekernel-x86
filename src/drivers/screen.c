@@ -71,6 +71,10 @@ int print_char(char c, int col, int row, char attr) {
     if (c == '\n') {
         int rows = cursor_offset / (2 * MAX_COLS);
         cursor_offset = get_offset(0, rows + 1);
+    } else if (c == '\b') {
+        if (cursor_offset > 0) {
+            cursor_offset -= 2;
+        }
     } else {
         vidmem[cursor_offset] = c;
         vidmem[cursor_offset+1] = attr;

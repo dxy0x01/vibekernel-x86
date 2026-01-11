@@ -56,8 +56,8 @@ irq_common_stub:
   [global isr%1]        ; %1 accesses the first parameter.
   isr%1:
     cli
-    push 0         ; Push a dummy error code (so stack is uniform)
-    push %1        ; Push the interrupt number
+    push byte 0         ; Push a dummy error code (so stack is uniform)
+    push byte %1        ; Push the interrupt number
     jmp isr_common_stub
 %endmacro
 
@@ -65,7 +65,7 @@ irq_common_stub:
   [global isr%1]
   isr%1:
     cli
-    push %1
+    push byte %1
     jmp isr_common_stub
 %endmacro
 
@@ -73,8 +73,8 @@ irq_common_stub:
   [global irq%1]
   irq%1:
     cli
-    push 0
-    push %2
+    push byte 0
+    push byte %2
     jmp irq_common_stub
 %endmacro
 
@@ -111,7 +111,6 @@ ISR_NOERRCODE 28
 ISR_NOERRCODE 29
 ISR_NOERRCODE 30
 ISR_NOERRCODE 31
-ISR_NOERRCODE 128
 
 ; IRQs
 IRQ 0, 32

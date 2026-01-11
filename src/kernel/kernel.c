@@ -17,6 +17,8 @@
 #include "panic.h"
 #include "../task/task.h"
 #include "../task/process.h"
+#include "../drivers/keyboard.h"
+#include "command.h"
 
 // Simulate idt_init if it doesn't match exactly yet
 void idt_init() {
@@ -141,25 +143,53 @@ void main() {
     set_idt();
     __asm__ __volatile__("sti");
 
-    // Run legacy hardware/fs tests (Disabled for clean boot)
-    // kernel_tests();
+    keyboard_init();
+    command_init();
 
-    // Testing First User Process Application
-    serial_print("VibeKernel: Loading First User Process (BLANK.BIN)...\n");
-    print_string("Loading BLANK.BIN...\n");
-
-    struct process* p_blank = NULL;
-    if (process_load("1:/BLANK.BIN", &p_blank) != 0) {
-        panic("Failed to load blank.bin");
+    // Register basic commands
+    extern void help_handler(int argc, char** argv);
+    command_register("help", "Display this help message", help_handler);
+    
+    void cls_handler(int argc, char** argv) {
+        clear_screen();
     }
+    command_register("cls", "Clear the screen", cls_handler);
 
-    struct task* t_blank = task_new(p_blank);
-    t_blank->regs.eip = 0x400000;
+    void version_handler(int argc, char** argv) {
+        print_string("VibeKernel-x86 v0.1.0\n");
+    }
+    command_register("version", "Display kernel version", version_handler);
 
-    task_switch(t_blank);
+    print_string("Type 'help' for a list of commands.\n");
 
-    serial_print("This should never be reached!\n");
-    panic("USER LAND RETURN ERROR");
+    char cmd_buf[128];
+    int cmd_idx = 0;
 
-    while(1);
+    while(1) {
+        print_string("> ");
+        cmd_idx = 0;
+        memset(cmd_buf, 0, sizeof(cmd_buf));
+
+        while (1) {
+            char c = keyboard_getc();
+            if (c == '\n') {
+                print_string("\n");
+                cmd_buf[cmd_idx] = '\0';
+                break;
+            } else if (c == '\b' || c == 0x7F) {
+                if (cmd_idx > 0) {
+                    cmd_idx--;
+                    print_string("\b \b");
+                }
+            } else {
+                if (cmd_idx < sizeof(cmd_buf) - 1) {
+                    cmd_buf[cmd_idx++] = c;
+                    char s[2] = {c, 0};
+                    print_string(s);
+                }
+            }
+        }
+
+        command_run(cmd_buf);
+    }
 }
