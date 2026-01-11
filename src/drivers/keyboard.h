@@ -5,6 +5,8 @@
 #include "../cpu/isr.h"
 
 #define KEY_DELETE 0x7F
+#define LSHIFT 0x2A
+#define RSHIFT 0x36
 
 void keyboard_init();
 void keyboard_handler(registers_t *regs);
