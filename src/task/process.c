@@ -36,6 +36,8 @@ out:
     return res;
 }
 
+#include "../fs/file.h"
+
 int process_load(const char* filename, struct process** process) {
     int res = 0;
     struct process* proc = NULL;
@@ -44,12 +46,39 @@ int process_load(const char* filename, struct process** process) {
     if (res < 0) goto out;
 
     strcpy(proc->name, filename);
-    // TODO: Implement binary loading (ELF/Binary)
-    // For now, it's just a placeholder loader
+    
+    // Open the binary file
+    int fd = fopen(filename, "r");
+    if (fd < 0) {
+        res = -1;
+        goto out;
+    }
 
+    struct file_stat stat;
+    if (fstat(fd, &stat) != 0) {
+        res = -1;
+        goto out;
+    }
+
+    proc->size = stat.filesize;
+    proc->ptr = kmalloc(proc->size);
+    if (!proc->ptr) {
+        res = -1;
+        goto out;
+    }
+
+    if (fread(proc->ptr, proc->size, 1, fd) != 1) {
+        res = -1;
+        goto out;
+    }
+
+    fclose(fd);
     *process = proc;
 
 out:
+    if (res < 0 && proc) {
+        process_free(proc);
+    }
     return res;
 }
 

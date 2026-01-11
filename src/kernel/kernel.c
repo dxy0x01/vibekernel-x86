@@ -73,9 +73,9 @@ void kernel_tests() {
         uint16_t* root_buf = (uint16_t*)kmalloc(512);
         ata_read_sector(1, root_sec, root_buf);
         struct fat_directory_item* dir_entry = (struct fat_directory_item*)root_buf;
-        memcpy(dir_entry->filename, "DIR     ", 8);
-        dir_entry->attribute = 0x10; 
-        dir_entry->low_16_bits_first_cluster = 3; 
+        memcpy(&dir_entry[10], "DIR     ", 8);
+        dir_entry[10].attribute = 0x10; 
+        dir_entry[10].low_16_bits_first_cluster = 3; 
         ata_write_sector(1, root_sec, root_buf);
         
         uint32_t dir_sec = fat16_cluster_to_sector(&drive1, 3);
@@ -103,9 +103,6 @@ void kernel_tests() {
         fat_buf[4] = 5; fat_buf[5] = 0xFFFF;
         ata_write_sector(1, fat_sec, fat_buf);
         kfree(fat_buf);
-
-        fs_init();
-        fs_insert_filesystem(fat16_init_vfs());
         
         int fd = fopen("1:/DIR/TEST.TXT", "r");
         if (fd > 0) {
@@ -135,6 +132,8 @@ void main() {
     
     idt_init();
     kheap_init();
+    fs_init();
+    fs_insert_filesystem(fat16_init_vfs());
     
     kernel_chunk = paging_new_4gb(PAGING_IS_WRITEABLE | PAGING_IS_PRESENT | PAGING_ACCESS_FROM_ALL);
     paging_switch(paging_4gb_chunk_get_directory(kernel_chunk));
@@ -145,17 +144,19 @@ void main() {
     // Run legacy hardware/fs tests
     kernel_tests();
 
-    // Testing Process foundations
-    serial_print("Testing User Land Functionality...\n");
-    print_string("Entering User Mode...\n");
+    // Testing First User Process Application
+    serial_print("Loading First User Process (blank.bin)...\n");
+    print_string("Loading blank.bin...\n");
 
-    struct process* p_user = NULL;
-    process_load("USERAPP", &p_user);
+    struct process* p_blank = NULL;
+    if (process_load("1:/BLANK.BIN", &p_blank) != 0) {
+        panic("Failed to load blank.bin");
+    }
 
-    struct task* t_user = task_new(p_user);
-    t_user->regs.eip = (uint32_t)user_test_app;
+    struct task* t_blank = task_new(p_blank);
+    t_blank->regs.eip = (uint32_t)p_blank->ptr;
 
-    task_switch(t_user);
+    task_switch(t_blank);
 
     serial_print("This should never be reached!\n");
     panic("USER LAND RETURN ERROR");

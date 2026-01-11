@@ -12,6 +12,8 @@ struct process {
     struct task* task;
     void* file_descriptors[MAX_PROCESS_FILES];
     struct paging_4gb_chunk* paging_chunk;
+    void* ptr;
+    uint32_t size;
     struct process* next;
 };
 

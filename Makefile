@@ -174,9 +174,13 @@ clean:
 	@echo "Cleaned build artifacts"
 
 # Create fat16 test image
-$(BIN_DIR)/fat16.img: | $(BIN_DIR)
+$(BIN_DIR)/fat16.img: $(BIN_DIR)/blank.bin | $(BIN_DIR)
 	dd if=/dev/zero of=$(BIN_DIR)/fat16.img bs=1M count=16
 	mkfs.fat -F 16 $(BIN_DIR)/fat16.img
+	python3 inject_file.py $(BIN_DIR)/fat16.img $(BIN_DIR)/blank.bin blank.bin
+
+$(BIN_DIR)/blank.bin: programs/blank/blank.asm | $(BIN_DIR)
+	$(ASM) -f bin programs/blank/blank.asm -o $(BIN_DIR)/blank.bin
 
 run: all $(BIN_DIR)/fat16.img
 	$(QEMU) -drive format=raw,file=$(OS_IMAGE) -drive format=raw,file=$(BIN_DIR)/fat16.img -serial mon:stdio
