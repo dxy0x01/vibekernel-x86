@@ -86,22 +86,50 @@ void main() {
         serial_print("Alignment FAILED!\n");
     }
 
-    // Test ATA Disk Read
-    serial_print("Testing ATA Disk Read (Sector 0)...\n");
-    uint16_t* disk_buf = (uint16_t*)kmalloc(512);
-    if (ata_read_sector(0, disk_buf) == 0) {
-        serial_print("Disk Read Successful! First 16 bytes of Sector 0:\n");
-        uint8_t* byte_buf = (uint8_t*)disk_buf;
-        for (int i = 0; i < 16; i++) {
-            // Very basic hex-ish printing for serial
-            char high = (byte_buf[i] >> 4) & 0x0F;
-            char low = byte_buf[i] & 0x0F;
-            serial_putc(high < 10 ? high + '0' : high - 10 + 'A');
-            serial_putc(low < 10 ? low + '0' : low - 10 + 'A');
-            serial_putc(' ');
-        }
-        serial_putc('\n');
+    // Test ATA Disk Read/Write/Identify
+    serial_print("Testing Robust ATA Disk Driver...\n");
+    
+    if (ata_identify() == 0) {
+        serial_print("Drive IDENTIFY Successful!\n");
     } else {
-        serial_print("Disk Read FAILED!\n");
+        serial_print("Drive IDENTIFY FAILED!\n");
+    }
+
+    uint16_t* test_buffer = (uint16_t*)kmalloc(512);
+    // Fill with pattern
+    for(int i=0; i<256; i++) test_buffer[i] = 0xAA55; // Distinct pattern
+
+    serial_print("Writing pattern 0xAA55 to Sector 2...\n");
+    int res = ata_write_sector(2, test_buffer);
+    if (res == 0) {
+        serial_print("Write Successful.\n");
+    } else {
+        serial_print("Write FAILED! Code: ");
+        serial_putc((res*-1) + '0');
+        serial_print("\n");
+    }
+
+    // Clear buffer
+    for(int i=0; i<256; i++) test_buffer[i] = 0;
+
+    serial_print("Reading back Sector 2...\n");
+    res = ata_read_sector(2, test_buffer);
+    if (res == 0) {
+        if (test_buffer[0] == 0xAA55) {
+            serial_print("Verification Success: Read back 0xAA55 from Sector 2!\n");
+        } else {
+            serial_print("Verification FAILED: Pattern mismatch! Read: ");
+            // Print first word
+            uint16_t val = test_buffer[0];
+            for(int j=0; j<4; j++) {
+                char h = (val >> (12-j*4)) & 0xF;
+                serial_putc(h < 10 ? h + '0' : h - 10 + 'A');
+            }
+            serial_print("\n");
+        }
+    } else {
+        serial_print("Read back FAILED! Code: ");
+        serial_putc((res*-1) + '0');
+        serial_print("\n");
     }
 }

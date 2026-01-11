@@ -21,6 +21,8 @@
 #define ATA_STATUS_DRQ  0x08
 #define ATA_STATUS_ERR  0x01
 
+int ata_identify();
 int ata_read_sector(uint32_t lba, uint16_t* buffer);
+int ata_write_sector(uint32_t lba, uint16_t* buffer);
 
 #endif
