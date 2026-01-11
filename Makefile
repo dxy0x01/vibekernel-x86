@@ -9,12 +9,13 @@ QEMU = qemu-system-i386
 
 # Flags
 CFLAGS = -m32 -ffreestanding -c -fno-pie
-LDFLAGS = -m elf_i386 -Ttext 0x1000 --oformat binary
+LDFLAGS = -m elf_i386 -T linker.ld --oformat binary
 
 # Directories
 SRC_DIR = src
 BOOT_DIR = $(SRC_DIR)/boot
 KERNEL_DIR = $(SRC_DIR)/kernel
+DRIVERS_DIR = $(SRC_DIR)/drivers
 BIN_DIR = bin
 
 # Files
@@ -24,6 +25,8 @@ KERNEL_ENTRY = $(KERNEL_DIR)/kernel_entry.asm
 KERNEL_ENTRY_OBJ = $(BIN_DIR)/kernel_entry.o
 KERNEL_C = $(KERNEL_DIR)/kernel.c
 KERNEL_OBJ = $(BIN_DIR)/kernel.o
+SCREEN_C = $(DRIVERS_DIR)/screen.c
+SCREEN_OBJ = $(BIN_DIR)/screen.o
 KERNEL_BIN = $(BIN_DIR)/kernel.bin
 OS_IMAGE = $(BIN_DIR)/os-image.bin
 
@@ -48,9 +51,13 @@ $(KERNEL_ENTRY_OBJ): $(KERNEL_ENTRY) | $(BIN_DIR)
 $(KERNEL_OBJ): $(KERNEL_C) | $(BIN_DIR)
 	$(CC) $(CFLAGS) $(KERNEL_C) -o $(KERNEL_OBJ)
 
+# Compile Screen Driver
+$(SCREEN_OBJ): $(SCREEN_C) | $(BIN_DIR)
+	$(CC) $(CFLAGS) $(SCREEN_C) -o $(SCREEN_OBJ)
+
 # Link kernel
-$(KERNEL_BIN): $(KERNEL_ENTRY_OBJ) $(KERNEL_OBJ)
-	$(LD) $(LDFLAGS) -o $(KERNEL_BIN) $(KERNEL_ENTRY_OBJ) $(KERNEL_OBJ)
+$(KERNEL_BIN): $(KERNEL_ENTRY_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) linker.ld
+	$(LD) $(LDFLAGS) -o $(KERNEL_BIN) $(KERNEL_ENTRY_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ)
 
 # Create OS image (bootloader + kernel)
 $(OS_IMAGE): $(BOOTLOADER_BIN) $(KERNEL_BIN)

@@ -1,11 +1,7 @@
-void dummy_test_function() {
-}
+#include "../drivers/screen.h"
 
 void main() {
-    // Pointer to video memory
-    char* video_memory = (char*)0xb8000;
-    
-    // Write "X" at top left
-    *video_memory = 'X';
-    *(video_memory + 1) = 0x0f; // White on black
+    clear_screen();
+    print_string("Hello World from C Kernel!\n");
+    print_string("We are in Protected Mode.");
 }
