@@ -8,6 +8,13 @@
 #define FAT16_ENTRY_SIZE 2
 #define FAT16_UNUSED 0x00
 
+#define FAT16_CLUSTER_FREE 0x0000
+#define FAT16_CLUSTER_RESERVED_MIN 0xFFF0
+#define FAT16_CLUSTER_RESERVED_MAX 0xFFF6
+#define FAT16_CLUSTER_BAD 0xFFF7
+#define FAT16_CLUSTER_LAST_MIN 0xFFF8
+#define FAT16_CLUSTER_LAST_MAX 0xFFFF
+
 typedef uint8_t FAT_DIRECTORY_ITEM_ATTRIB;
 #define FAT_FILE_READ_ONLY 0x01
 #define FAT_FILE_HIDDEN 0x02
@@ -18,7 +25,7 @@ typedef uint8_t FAT_DIRECTORY_ITEM_ATTRIB;
 #define FAT_FILE_DEVICE 0x40
 #define FAT_FILE_RESERVED 0x80
 
-struct fat_header {
+struct fat_boot_sector {
     uint8_t short_jmp_ins[3];
     uint8_t oem_identifier[8];
     uint16_t bytes_per_sector;
@@ -33,15 +40,17 @@ struct fat_header {
     uint16_t number_of_heads;
     uint32_t hidden_sectors;
     uint32_t sectors_big;
-} __attribute__((packed));
 
-struct fat_header_extended {
+    // Extended BPB (FAT12/FAT16)
     uint8_t drive_number;
     uint8_t reserved;
     uint8_t signature;
     uint32_t volume_id;
     uint8_t volume_label[11];
     uint8_t system_id[8];
+
+    uint8_t boot_code[448];
+    uint16_t boot_signature;
 } __attribute__((packed));
 
 struct fat_directory_item {
@@ -61,8 +70,7 @@ struct fat_directory_item {
 } __attribute__((packed));
 
 struct fat_private {
-    struct fat_header header;
-    struct fat_header_extended header_extended;
+    struct fat_boot_sector bpb;
     struct disk_stream* stream;
 };
 

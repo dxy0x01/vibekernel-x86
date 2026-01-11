@@ -46,9 +46,9 @@ void fat16_get_full_relative_filename(struct fat_directory_item* item, char* out
 
 static uint32_t fat16_get_fat_entry(struct disk* disk, uint32_t cluster) {
     struct fat_private* private = disk->fs_private;
-    uint32_t fat_table_sector = private->header.reserved_sectors;
+    uint32_t fat_table_sector = private->bpb.reserved_sectors;
     uint32_t fat_table_offset = cluster * FAT16_ENTRY_SIZE;
-    uint32_t fat_table_abs_pos = (fat_table_sector * private->header.bytes_per_sector) + fat_table_offset;
+    uint32_t fat_table_abs_pos = (fat_table_sector * private->bpb.bytes_per_sector) + fat_table_offset;
     
     diskstream_seek(private->stream, fat_table_abs_pos);
     
@@ -62,13 +62,13 @@ static uint32_t fat16_get_fat_entry(struct disk* disk, uint32_t cluster) {
 
 static uint32_t fat16_get_cluster_for_offset(struct disk* disk, uint32_t start_cluster, uint32_t offset) {
     struct fat_private* private = disk->fs_private;
-    uint32_t cluster_size = private->header.sectors_per_cluster * private->header.bytes_per_sector;
+    uint32_t cluster_size = private->bpb.sectors_per_cluster * private->bpb.bytes_per_sector;
     uint32_t clusters_to_skip = offset / cluster_size;
     uint32_t current_cluster = start_cluster;
     
     for (uint32_t i = 0; i < clusters_to_skip; i++) {
         current_cluster = fat16_get_fat_entry(disk, current_cluster);
-        if (current_cluster >= 0xFFF8) {
+        if (current_cluster >= FAT16_CLUSTER_LAST_MIN) {
             return 0xFFFF; // End of chain
         }
     }
@@ -79,25 +79,25 @@ static uint32_t fat16_get_cluster_for_offset(struct disk* disk, uint32_t start_c
 // Logic to convert cluster to absolute sector
 uint32_t fat16_cluster_to_sector(struct disk* disk, uint32_t cluster) {
     struct fat_private* private = disk->fs_private;
-    uint32_t root_dir_sectors = ((private->header.root_dir_entries * 32) + (private->header.bytes_per_sector - 1)) / private->header.bytes_per_sector;
-    uint32_t first_data_sector = private->header.reserved_sectors + (private->header.fat_copies * private->header.fat_sectors) + root_dir_sectors;
-    return first_data_sector + (cluster - 2) * private->header.sectors_per_cluster;
+    uint32_t root_dir_sectors = ((private->bpb.root_dir_entries * 32) + (private->bpb.bytes_per_sector - 1)) / private->bpb.bytes_per_sector;
+    uint32_t first_data_sector = private->bpb.reserved_sectors + (private->bpb.fat_copies * private->bpb.fat_sectors) + root_dir_sectors;
+    return first_data_sector + (cluster - 2) * private->bpb.sectors_per_cluster;
 }
 
 uint32_t fat16_get_root_directory_sector(struct disk* disk) {
     struct fat_private* private = disk->fs_private;
-    return private->header.reserved_sectors + (private->header.fat_copies * private->header.fat_sectors);
+    return private->bpb.reserved_sectors + (private->bpb.fat_copies * private->bpb.fat_sectors);
 }
 
 uint32_t fat16_get_bytes_per_sector(struct disk* disk) {
     struct fat_private* private = disk->fs_private;
-    return private->header.bytes_per_sector;
+    return private->bpb.bytes_per_sector;
 }
 
 static int fat16_get_directory_entry(struct disk* disk, uint32_t cluster, const char* name, struct fat_directory_item* out_item) {
     struct fat_private* private = disk->fs_private;
-    uint32_t bytes_per_sector = private->header.bytes_per_sector;
-    uint32_t root_dir_entries = private->header.root_dir_entries;
+    uint32_t bytes_per_sector = private->bpb.bytes_per_sector;
+    uint32_t root_dir_entries = private->bpb.root_dir_entries;
     uint32_t items_processed = 0;
     
     if (cluster == 0) { // Root Directory
@@ -118,10 +118,10 @@ static int fat16_get_directory_entry(struct disk* disk, uint32_t cluster, const 
             }
         }
     } else { // Subdirectory (Cluster Chain)
-        uint32_t cluster_size = private->header.sectors_per_cluster * bytes_per_sector;
+        uint32_t cluster_size = private->bpb.sectors_per_cluster * bytes_per_sector;
         uint32_t current_cluster = cluster;
         
-        while (current_cluster < 0xFFF0) {
+        while (current_cluster < FAT16_CLUSTER_RESERVED_MIN) {
             uint32_t abs_sector = fat16_cluster_to_sector(disk, current_cluster);
             diskstream_seek(private->stream, abs_sector * bytes_per_sector);
             
@@ -171,19 +171,19 @@ int fat16_read(struct disk* disk, void* private_data, uint32_t size, uint32_t nm
     }
     
     uint32_t total_read = 0;
-    uint32_t cluster_size = private->header.sectors_per_cluster * private->header.bytes_per_sector;
+    uint32_t cluster_size = private->bpb.sectors_per_cluster * private->bpb.bytes_per_sector;
     
     while (total_read < total_to_read) {
         uint32_t offset_in_file = desc->pos + total_read;
         uint32_t current_cluster = fat16_get_cluster_for_offset(disk, desc->item.low_16_bits_first_cluster, offset_in_file);
         
-        if (current_cluster >= 0xFFF0) {
+        if (current_cluster >= FAT16_CLUSTER_RESERVED_MIN) {
             break; // Something went wrong or end of file
         }
         
         uint32_t offset_in_cluster = offset_in_file % cluster_size;
         uint32_t abs_sector = fat16_cluster_to_sector(disk, current_cluster);
-        uint32_t abs_pos = (abs_sector * private->header.bytes_per_sector) + offset_in_cluster;
+        uint32_t abs_pos = (abs_sector * private->bpb.bytes_per_sector) + offset_in_cluster;
         
         uint32_t to_read_this_cluster = cluster_size - offset_in_cluster;
         if (to_read_this_cluster > (total_to_read - total_read)) {
@@ -239,28 +239,20 @@ int fat16_resolve(struct disk* disk) {
     struct disk_stream* stream = diskstream_new(disk->id);
     if (!stream) return -1;
     
-    struct fat_header header;
-    struct fat_header_extended header_extended;
-    
-    if (diskstream_read(stream, &header, sizeof(header)) != 0) {
+    struct fat_boot_sector bpb;
+    if (diskstream_read(stream, &bpb, sizeof(bpb)) != 0) {
         diskstream_close(stream);
         return -2;
     }
     
-    if (diskstream_read(stream, &header_extended, sizeof(header_extended)) != 0) {
-        diskstream_close(stream);
-        return -3;
-    }
-    
-    if (header_extended.signature != 0x29) {
+    if (bpb.signature != 0x29) {
         diskstream_close(stream);
         return -4;
     }
     
     struct fat_private* private = kmalloc(sizeof(struct fat_private));
     private->stream = stream;
-    private->header = header;
-    private->header_extended = header_extended;
+    private->bpb = bpb;
     disk->fs_private = private;
     
     return 0;
