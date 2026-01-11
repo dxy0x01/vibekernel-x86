@@ -22,8 +22,16 @@ void gdt_init() {
     gdt_ptr.base  = (uint32_t)&gdt;
 
     gdt_set_gate(0, 0, 0, 0, 0);                // Null segment
-    gdt_set_gate(1, 0, 0xFFFFFFFF, 0x9A, 0xCF); // Code segment
-    gdt_set_gate(2, 0, 0xFFFFFFFF, 0x92, 0xCF); // Data segment
+    
+    // Code segment: base=0, limit=0xffffffff, present, ring 0, code, exec/read, 4KB granularity, 32-bit
+    gdt_set_gate(1, 0, 0xFFFFFFFF, 
+                 GDT_ACCESS_PRESENT | GDT_ACCESS_S | GDT_ACCESS_TYPE_CODE_EXREAD, 
+                 GDT_GRAN_4KB | GDT_GRAN_32BIT); 
+
+    // Data segment: base=0, limit=0xffffffff, present, ring 0, data, read/write, 4KB granularity, 32-bit
+    gdt_set_gate(2, 0, 0xFFFFFFFF, 
+                 GDT_ACCESS_PRESENT | GDT_ACCESS_S | GDT_ACCESS_TYPE_DATA_RDWR, 
+                 GDT_GRAN_4KB | GDT_GRAN_32BIT);
 
     gdt_flush((uint32_t)&gdt_ptr);
 }

@@ -21,6 +21,16 @@ struct gdt_ptr_struct {
 
 typedef struct gdt_ptr_struct gdt_ptr_t;
 
+#define GDT_ACCESS_PRESENT     0x80
+#define GDT_ACCESS_DPL0        0x00
+#define GDT_ACCESS_DPL3        0x60
+#define GDT_ACCESS_S           0x10
+#define GDT_ACCESS_TYPE_CODE_EXREAD 0x0A
+#define GDT_ACCESS_TYPE_DATA_RDWR   0x02
+
+#define GDT_GRAN_4KB           0x80
+#define GDT_GRAN_32BIT         0x40
+
 void gdt_init();
 
 #endif
