@@ -15,17 +15,46 @@ start:
     ; Clear screen
     call clear_screen
 
+    ; Initialize serial port
+    call init_serial
+
     ; Print hello message
     mov si, msg_hello
     call print_string
     
-    ; Initialize serial port and print to it (for headless testing)
-    call init_serial
-    mov si, msg_hello
-    call print_serial
+    ; --- IVT Code Start ---
+    ; Hook interrupt 0x44 (arbitrary choice)
+    ; IVT entry for 0x44 is at 0x44 * 4 = 170 * 4 = 680 = 0x2A8
+    cli                     ; Disable interrupts while changing IVT
+    
+    xor ax, ax
+    mov es, ax              ; ES = 0 because IVT is at 0x0000
+    
+    ; Store Offset (address of handler)
+    mov word [es:0x44*4], handle_int44
+    
+    ; Store Segment (0x0000)
+    mov word [es:0x44*4+2], 0x0000
+    
+    sti                     ; Enable interrupts
+    
+    ; Trigger our custom interrupt
+    mov si, msg_trigger
+    call print_string
+    int 0x44
+    
+    ; --- IVT Code End ---
 
     ; Halt the system
     jmp $
+
+; interrupt 0x44 handler
+handle_int44:
+    pusha
+    mov si, msg_int_fired
+    call print_string
+    popa
+    iret            ; Interrupt Return (pops CS, IP, FLAGS)
 
 ; Function: init_serial
 ; Initialize COM1 for serial output
@@ -85,10 +114,14 @@ clear_screen:
     ret
 
 ; Function: print_string
-; Prints a null-terminated string
+; Prints a null-terminated string to BIOS and Serial
 ; Input: SI = pointer to string
 print_string:
     pusha           ; Save all registers
+    
+    ; Print to serial first (preserves SI effectively because of pusha/popa in print_serial)
+    call print_serial
+    
     mov ah, 0x0E    ; BIOS teletype output function
 
 .loop:
@@ -104,8 +137,9 @@ print_string:
 
 ; Data section
 msg_hello: db 'VibeKernel-x86 Bootloader', 0x0D, 0x0A
-           db 'Hello World from Real Mode!', 0x0D, 0x0A
-           db 'Booting...', 0x0D, 0x0A, 0
+           db 'Hello World from Real Mode!', 0x0D, 0x0A, 0
+msg_trigger: db 'Triggering int 0x44...', 0x0D, 0x0A, 0
+msg_int_fired: db 'Interrupt 0x44 Handled!', 0x0D, 0x0A, 0
 
 ; Padding and boot signature
 times 510-($-$$) db 0   ; Pad with zeros to byte 510
