@@ -54,6 +54,8 @@ GDT_C = $(CPU_DIR)/gdt.c
 GDT_OBJ = $(BIN_DIR)/gdt.o
 GDT_ASM = $(CPU_DIR)/gdt.asm
 GDT_ASM_OBJ = $(BIN_DIR)/gdt_asm.o
+SYSCALL_C = $(SRC_DIR)/task/syscall.c
+SYSCALL_OBJ = $(BIN_DIR)/syscall.o
 KERNEL_BIN = $(BIN_DIR)/kernel.bin
 OS_IMAGE = $(BIN_DIR)/os-image.bin
 
@@ -157,9 +159,12 @@ $(PROCESS_OBJ): $(PROCESS_C) | $(BIN_DIR)
 $(GDT_ASM_OBJ): $(GDT_ASM) | $(BIN_DIR)
 	$(ASM) -f elf $(GDT_ASM) -o $(GDT_ASM_OBJ)
 
+$(SYSCALL_OBJ): $(SYSCALL_C) | $(BIN_DIR)
+	$(CC) $(CFLAGS) $(SYSCALL_C) -o $(SYSCALL_OBJ)
+
 # Link kernel
-$(KERNEL_BIN): $(KERNEL_ENTRY_OBJ) $(GDT_ASM_OBJ) $(GDT_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(PORTS_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ) $(BIN_DIR)/kheap.o $(BIN_DIR)/paging.o $(BIN_DIR)/serial.o $(BIN_DIR)/ata.o $(DISK_STREAM_OBJ) $(BIN_DIR)/string.o $(BIN_DIR)/path_parser.o $(FAT16_OBJ) $(VFS_OBJ) $(PANIC_OBJ) $(TASK_OBJ) $(TASK_ASM_OBJ) $(PROCESS_OBJ) linker.ld
-	$(LD) $(LDFLAGS) -o $(KERNEL_BIN) $(KERNEL_ENTRY_OBJ) $(GDT_ASM_OBJ) $(GDT_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(PORTS_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ) $(BIN_DIR)/kheap.o $(BIN_DIR)/paging.o $(BIN_DIR)/serial.o $(BIN_DIR)/ata.o $(DISK_STREAM_OBJ) $(BIN_DIR)/string.o $(BIN_DIR)/path_parser.o $(FAT16_OBJ) $(VFS_OBJ) $(PANIC_OBJ) $(TASK_OBJ) $(TASK_ASM_OBJ) $(PROCESS_OBJ)
+$(KERNEL_BIN): $(KERNEL_ENTRY_OBJ) $(GDT_ASM_OBJ) $(GDT_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(PORTS_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ) $(BIN_DIR)/kheap.o $(BIN_DIR)/paging.o $(BIN_DIR)/serial.o $(BIN_DIR)/ata.o $(DISK_STREAM_OBJ) $(BIN_DIR)/string.o $(BIN_DIR)/path_parser.o $(FAT16_OBJ) $(VFS_OBJ) $(PANIC_OBJ) $(TASK_OBJ) $(TASK_ASM_OBJ) $(PROCESS_OBJ) $(SYSCALL_OBJ) linker.ld
+	$(LD) $(LDFLAGS) -o $(KERNEL_BIN) $(KERNEL_ENTRY_OBJ) $(GDT_ASM_OBJ) $(GDT_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(PORTS_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ) $(BIN_DIR)/kheap.o $(BIN_DIR)/paging.o $(BIN_DIR)/serial.o $(BIN_DIR)/ata.o $(DISK_STREAM_OBJ) $(BIN_DIR)/string.o $(BIN_DIR)/path_parser.o $(FAT16_OBJ) $(VFS_OBJ) $(PANIC_OBJ) $(TASK_OBJ) $(TASK_ASM_OBJ) $(PROCESS_OBJ) $(SYSCALL_OBJ)
 
 # Create OS image (bootloader + kernel)
 $(OS_IMAGE): $(BOOTLOADER_BIN) $(KERNEL_BIN)

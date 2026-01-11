@@ -1,13 +1,18 @@
 [BITS 32]
+org 0x400000
 
 section .asm
 
 global _start
 
 _start:
-    ; Write 'B' to top-left of screen with bright white on blue background
-    mov byte [0xB8000], 'B'
-    mov byte [0xB8001], 0x1F
+    ; Use syscall to print
+    mov eax, 0 ; SYSCALL_PRINT
+    mov ebx, msg
+    int 0x80
 
 loop:
     jmp loop
+
+section .data
+msg: db "Hello from User Mode via Syscall!", 0
