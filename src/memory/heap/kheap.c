@@ -30,12 +30,13 @@ void *kmalloc_int(uint32_t size, int align, uint32_t *phys) {
     if (size <= 0) return NULL;
 
     if (!global_base) { // First call
-        // Handle alignment for the first block
-        // We ensure (placement_address + sizeof(block_meta_t)) is 4096 aligned
-        if (align == 1 && ((placement_address + sizeof(block_meta_t)) & 0xFFF)) {
-            placement_address &= 0xFFFFF000;
-            placement_address += 0x1000;
-            placement_address -= sizeof(block_meta_t);
+        if (align == 1) {
+            uint32_t addr = placement_address + sizeof(block_meta_t);
+            if (addr & 0xFFF) {
+                placement_address &= 0xFFFFF000;
+                placement_address += 0x1000;
+                placement_address -= sizeof(block_meta_t);
+            }
         }
         
         block = request_space(NULL, size);
@@ -44,34 +45,26 @@ void *kmalloc_int(uint32_t size, int align, uint32_t *phys) {
     } else {
         block_meta_t *last = global_base;
         block = find_free_block(&last, size);
-        if (!block) { // Failed to find free block
-            // Handle alignment for usage of placement pointer
-            if (align == 1 && ((placement_address + sizeof(block_meta_t)) & 0xFFF)) {
-                 placement_address &= 0xFFFFF000;
-                 placement_address += 0x1000;
-                 placement_address -= sizeof(block_meta_t);
+        
+        if (block && align) {
+            uint32_t addr = (uint32_t)(block + 1);
+            if (addr & 0xFFF) {
+                block = NULL; // Force new allocation if block not aligned
             }
-            
+        }
+
+        if (!block) { // Need new space
+            if (align == 1) {
+                uint32_t addr = placement_address + sizeof(block_meta_t);
+                if (addr & 0xFFF) {
+                    placement_address &= 0xFFFFF000;
+                    placement_address += 0x1000;
+                    placement_address -= sizeof(block_meta_t);
+                }
+            }
             block = request_space(last, size);
             if (!block) return NULL;
-        } else {      // Found free block
-            // TODO: If we found a block, it might NOT be aligned aligned!
-            // This is a naive implementation: kmalloc_a only guarantees alignment
-            // for NEW blocks. Reusing blocks for aligned requests is dangerous
-            // without splitting/checking.
-            // For Paging, we mostly allocate once at start.
-            // Safe hack: If requesting aligned, FORCE new block?
-            if (align) {
-                 // Check alignment
-                 uint32_t addr = (uint32_t)(block + 1);
-                 if (addr & 0xFFF) {
-                     // Not aligned. Skip this block?
-                     // For now, let's just make a new one to be safe.
-                     block = request_space(last, size); 
-                     if (!block) return NULL;
-                 }
-            }
-            
+        } else {
             block->free = 0;
             block->magic = 0x77777777;
         }

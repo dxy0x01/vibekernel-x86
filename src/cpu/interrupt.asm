@@ -15,7 +15,9 @@ isr_common_stub:
     mov fs, ax
     mov gs, ax
 
+    push esp       ; Push pointer to registers_t
     call isr_handler
+    add esp, 4     ; Clean up pointer
 
     pop eax        ; reload the original data segment descriptor
     mov ds, ax
@@ -37,7 +39,9 @@ irq_common_stub:
     mov es, ax
     mov fs, ax
     mov gs, ax
+    push esp
     call irq_handler
+    add esp, 4
     pop eax
     mov ds, ax
     mov es, ax

@@ -1,10 +1,14 @@
 #include "../drivers/screen.h"
 #include "../cpu/isr.h"
+#include "../cpu/idt.h"
 #include "../drivers/serial.h"
 #include "../drivers/ata.h"
+#include "../fs/path_parser.h"
 
 #include "../memory/heap/kheap.h"
 #include "../memory/paging/paging.h"
+
+#include "../cpu/gdt.h"
 
 // Simulate idt_init if it doesn't match exactly yet
 void idt_init() {
@@ -14,8 +18,9 @@ void idt_init() {
 static struct paging_4gb_chunk* kernel_chunk = 0;
 
 void main() {
+    gdt_init();
     serial_init();
-    serial_print("Serial Initialized.\n");
+    serial_print("GDT and Serial Initialized.\n");
 
     clear_screen();
     print_string("Hello World from C Kernel!\n");
@@ -37,10 +42,19 @@ void main() {
     // Enable paging
     enable_paging();
     serial_print("Paging Enabled.\n");
-    
+
+    // Reload IDT at virtual address (identity mapped)
+    set_idt();
+    serial_print("IDT Reloaded.\n");
+
+    // Mask all IRQs except 0 (Timer) and 1 (Keyboard)
+    // 0xFC = 1111 1100
+    port_byte_out(0x21, 0xFC);
+    port_byte_out(0xA1, 0xFF);
+
     __asm__ __volatile__("sti");
 
-    print_string("Paging Initialized.\n");
+    print_string("Paging Initialized. Interrupts ENABLED.\n");
     
     // Test Dynamic Mapping
     // Map Physical 0xB8000 (VGA) to Virtual 0xC0000000
@@ -70,12 +84,6 @@ void main() {
     // Test Alignment logic
     void* ptr1 = kmalloc_a(100);
     print_string("Aligned Malloc: 0x");
-    // Manual hex printing (since print_hex is in screen.h but not exposed? or is it?)
-    // Actually print_hex was in screen.h?
-    // I should check screen.h content.
-    // Assuming print_hex is available.
-    // print_hex((uint32_t)ptr1);
-    // print_string("\n");
     
     // Check bits 0-11 are zero
     if (((uint32_t)ptr1 & 0xFFF) == 0) {
@@ -132,4 +140,28 @@ void main() {
         serial_putc((res*-1) + '0');
         serial_print("\n");
     }
+
+    // Test Path Parser
+    serial_print("Testing Path Parser...\n");
+    struct path_root* root = pathparser_parse("0:/home/usr/test.txt", NULL);
+    if (root) {
+        serial_print("Parsed Drive: ");
+        serial_putc(root->drive_no + '0');
+        serial_print("\nParts:\n");
+        struct path_part* part = root->first;
+        while (part) {
+            serial_print(" - ");
+            serial_print((char*)part->part);
+            serial_print("\n");
+            part = part->next;
+        }
+        serial_print("Freeing path parser root...\n");
+        pathparser_free(root);
+        serial_print("Freeing Success.\n");
+    } else {
+        serial_print("Path parsing FAILED!\n");
+    }
+
+    serial_print("Kernel execution finished. Hanging system...\n");
+    while(1);
 }

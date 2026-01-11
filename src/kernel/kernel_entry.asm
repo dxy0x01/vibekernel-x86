@@ -1,9 +1,13 @@
 [bits 32]
-[extern main] ; Define calling point. Must have same name as kernel.c 'main' function
-global _start ; Linker needs this to be known
+[extern main]
+[global _start]
 
 _start:
-    ; Ensure stack is 16-byte aligned for GCC
+    ; Set up our own stack at a safe location (512KB)
+    mov esp, 0x80000
+    
+    ; Ensure 16-byte alignment as required by GCC
     and esp, 0xFFFFFFF0
-    call main ; Call the C function
+    
+    call main
     jmp $

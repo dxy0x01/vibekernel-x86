@@ -2,6 +2,7 @@
 #include "idt.h"
 #include "../drivers/screen.h"
 #include "../drivers/ports.h"
+#include "../drivers/serial.h"
 
 // Declarations of external assembly symbols
 extern void isr0();
@@ -115,8 +116,8 @@ void isr_install() {
     port_byte_out(0xA1, 0x02);
     port_byte_out(0x21, 0x01);
     port_byte_out(0xA1, 0x01);
-    port_byte_out(0x21, 0x0);
-    port_byte_out(0xA1, 0x0); 
+    port_byte_out(0x21, 0xFF); // Initially mask all
+    port_byte_out(0xA1, 0xFF); 
 
     // Install IRQs
     set_idt_gate(32, (uint32_t)irq0);
@@ -178,23 +179,34 @@ char *exception_messages[] = {
     "Reserved"
 };
 
-void isr_handler(registers_t r) {
-    if (r.int_no < 32) {
+void isr_handler(registers_t *r) {
+    if (r->int_no < 32) {
+        serial_print("received internal interrupt: ");
+        serial_print(exception_messages[r->int_no]);
+        serial_print("\n");
+        
+        if (r->int_no == 14) { // Page Fault
+            uint32_t faulting_address;
+            __asm__ __volatile__("mov %%cr2, %0" : "=r" (faulting_address));
+            serial_print("Faulting address: 0x");
+            for (int i = 0; i < 8; i++) {
+                uint8_t nibble = (faulting_address >> (28 - i * 4)) & 0xF;
+                serial_putc(nibble < 10 ? nibble + '0' : nibble - 10 + 'A');
+            }
+            serial_print("\n");
+        }
+
         print_string("received interrupt: ");
-        print_string(exception_messages[r.int_no]);
+        print_string(exception_messages[r->int_no]);
         print_string("\n");
         __asm__("cli; hlt"); // Halt on exception
     }
 }
 
-void irq_handler(registers_t r) {
+void irq_handler(registers_t *r) {
     // Send EOI to PICs
-    if (r.int_no >= 40) port_byte_out(0xA0, 0x20); // Slave
+    if (r->int_no >= 40) port_byte_out(0xA0, 0x20); // Slave
     port_byte_out(0x20, 0x20); // Master
 
-    /*
-    if (r.int_no == 32) {
-        print_string("Tick\n");
-    }
-    */
+    // TOTALLY QUIET for stability
 }
