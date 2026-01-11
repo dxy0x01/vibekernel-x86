@@ -80,6 +80,10 @@ $(BIN_DIR)/paging.o: $(MEMORY_DIR)/paging/paging.c | $(BIN_DIR)
 $(PORTS_OBJ): $(PORTS_C) | $(BIN_DIR)
 	$(CC) $(CFLAGS) $(PORTS_C) -o $(PORTS_OBJ)
 
+# Compile Serial Driver
+$(BIN_DIR)/serial.o: $(DRIVERS_DIR)/serial.c | $(BIN_DIR)
+	$(CC) $(CFLAGS) $(DRIVERS_DIR)/serial.c -o $(BIN_DIR)/serial.o
+
 # Compile IDT
 $(IDT_OBJ): $(IDT_C) | $(BIN_DIR)
 	$(CC) $(CFLAGS) $(IDT_C) -o $(IDT_OBJ)
@@ -89,8 +93,8 @@ $(ISR_OBJ): $(ISR_C) | $(BIN_DIR)
 	$(CC) $(CFLAGS) $(ISR_C) -o $(ISR_OBJ)
 
 # Link kernel
-$(KERNEL_BIN): $(KERNEL_ENTRY_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(PORTS_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ) $(BIN_DIR)/kheap.o $(BIN_DIR)/paging.o linker.ld
-	$(LD) $(LDFLAGS) -o $(KERNEL_BIN) $(KERNEL_ENTRY_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(PORTS_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ) $(BIN_DIR)/kheap.o $(BIN_DIR)/paging.o
+$(KERNEL_BIN): $(KERNEL_ENTRY_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(PORTS_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ) $(BIN_DIR)/kheap.o $(BIN_DIR)/paging.o $(BIN_DIR)/serial.o linker.ld
+	$(LD) $(LDFLAGS) -o $(KERNEL_BIN) $(KERNEL_ENTRY_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(PORTS_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ) $(BIN_DIR)/kheap.o $(BIN_DIR)/paging.o $(BIN_DIR)/serial.o
 
 # Create OS image (bootloader + kernel)
 $(OS_IMAGE): $(BOOTLOADER_BIN) $(KERNEL_BIN)

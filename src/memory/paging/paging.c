@@ -60,3 +60,48 @@ void enable_paging()
     cr0 |= 0x80000000;
     __asm__ __volatile__("mov %0, %%cr0":: "r"(cr0));
 }
+
+int paging_is_aligned(void* addr)
+{
+    return ((uint32_t)addr % PAGING_PAGE_SIZE) == 0;
+}
+
+void paging_flush_tlb_single(uint32_t addr)
+{
+    __asm__ __volatile__("invlpg (%0)" :: "r" (addr) : "memory");
+}
+
+int paging_set(uint32_t* directory, void* virt, uint32_t val)
+{
+    if (!paging_is_aligned(virt))
+    {
+        return -1;
+    }
+
+    uint32_t directory_index = ((uint32_t)virt) >> 22;
+    uint32_t table_index = (((uint32_t)virt) >> 12) & 0x3FF;
+
+    uint32_t entry = directory[directory_index];
+    uint32_t* table = (uint32_t*)(entry & 0xFFFFF000);
+
+    if (!table)
+    {
+        // Allocate a new page table
+        table = kmalloc_a(sizeof(uint32_t) * PAGING_TOTAL_ENTRIES_PER_TABLE_SIZE);
+        for (int i = 0; i < PAGING_TOTAL_ENTRIES_PER_TABLE_SIZE; i++)
+        {
+            table[i] = 0;
+        }
+
+        // Add the table to the directory (Use flags from caller? No, val contains flags for PET)
+        // Usually PDEs share some common flags (Present | RW | User)
+        directory[directory_index] = (uint32_t)table | PAGING_IS_PRESENT | PAGING_IS_WRITEABLE | PAGING_ACCESS_FROM_ALL;
+    }
+
+    table[table_index] = val;
+
+    // Flush TLB
+    paging_flush_tlb_single((uint32_t)virt);
+
+    return 0;
+}
