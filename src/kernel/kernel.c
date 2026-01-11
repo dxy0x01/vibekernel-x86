@@ -14,6 +14,7 @@
 #include "../drivers/disk_stream.h"
 #include "../fs/fat16.h"
 #include "../fs/file.h"
+#include "panic.h"
 
 // Simulate idt_init if it doesn't match exactly yet
 void idt_init() {
@@ -298,6 +299,8 @@ void main() {
         serial_print("\n");
     }
 
-    serial_print("Kernel execution finished. Hanging system...\n");
+    serial_print("Kernel execution finished. Testing panic...\n");
+    panic("SYSTEM STOPPED MANUALLY");
+
     while(1);
 }

@@ -7,6 +7,6 @@
 
 void serial_init();
 void serial_putc(char c);
-void serial_print(char* str);
+void serial_print(const char* str);
 
 #endif

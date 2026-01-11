@@ -15,17 +15,24 @@ int get_offset_col(int offset);
 // Global cursor offset (simple version, not reading from VGA ports yet)
 int cursor_offset = 0;
 
-void print_at(char* message, int col, int row) {
+// Global color
+char screen_color = 0x0F;
+
+void print_set_colour(char color) {
+    screen_color = color;
+}
+
+void print_at(const char* message, int col, int row) {
     if (col >= 0 && row >= 0)
         cursor_offset = get_offset(col, row);
         
     int i = 0;
     while (message[i] != 0) {
-        cursor_offset = print_char(message[i++], col, row, WHITE_ON_BLACK);
+        cursor_offset = print_char(message[i++], col, row, screen_color);
     }
 }
 
-void print_string(char* message) {
+void print_string(const char* message) {
     print_at(message, -1, -1);
 }
 

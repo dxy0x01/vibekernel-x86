@@ -7,8 +7,11 @@
 #define WHITE_ON_BLACK 0x0f
 
 // Screen i/o functions
+void print_set_colour(char color);
 void clear_screen();
-void print_string(char* message);
-void print_at(char* message, int col, int row);
+void print_string(const char* message);
+void print_at(const char* message, int col, int row);
+
+#define print print_string
 
 #endif

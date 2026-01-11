@@ -18,7 +18,7 @@ void serial_putc(char c) {
    port_byte_out(COM1, c);
 }
 
-void serial_print(char* str) {
+void serial_print(const char* str) {
    for (int i = 0; str[i] != '\0'; i++) {
       serial_putc(str[i]);
    }

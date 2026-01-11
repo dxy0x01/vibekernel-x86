@@ -42,6 +42,8 @@ FAT16_C = $(SRC_DIR)/fs/fat16.c
 FAT16_OBJ = $(BIN_DIR)/fat16.o
 VFS_C = $(SRC_DIR)/fs/file.c
 VFS_OBJ = $(BIN_DIR)/file.o
+PANIC_C = $(KERNEL_DIR)/panic.c
+PANIC_OBJ = $(BIN_DIR)/panic.o
 GDT_C = $(CPU_DIR)/gdt.c
 GDT_OBJ = $(BIN_DIR)/gdt.o
 GDT_ASM = $(CPU_DIR)/gdt.asm
@@ -132,12 +134,16 @@ $(ISR_OBJ): $(ISR_C) | $(BIN_DIR)
 $(GDT_OBJ): $(GDT_C) | $(BIN_DIR)
 	$(CC) $(CFLAGS) $(GDT_C) -o $(GDT_OBJ)
 
+# Compile Panic
+$(PANIC_OBJ): $(PANIC_C) | $(BIN_DIR)
+	$(CC) $(CFLAGS) $(PANIC_C) -o $(PANIC_OBJ)
+
 $(GDT_ASM_OBJ): $(GDT_ASM) | $(BIN_DIR)
 	$(ASM) -f elf $(GDT_ASM) -o $(GDT_ASM_OBJ)
 
 # Link kernel
-$(KERNEL_BIN): $(KERNEL_ENTRY_OBJ) $(GDT_ASM_OBJ) $(GDT_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(PORTS_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ) $(BIN_DIR)/kheap.o $(BIN_DIR)/paging.o $(BIN_DIR)/serial.o $(BIN_DIR)/ata.o $(DISK_STREAM_OBJ) $(BIN_DIR)/string.o $(BIN_DIR)/path_parser.o $(FAT16_OBJ) $(VFS_OBJ) linker.ld
-	$(LD) $(LDFLAGS) -o $(KERNEL_BIN) $(KERNEL_ENTRY_OBJ) $(GDT_ASM_OBJ) $(GDT_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(PORTS_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ) $(BIN_DIR)/kheap.o $(BIN_DIR)/paging.o $(BIN_DIR)/serial.o $(BIN_DIR)/ata.o $(DISK_STREAM_OBJ) $(BIN_DIR)/string.o $(BIN_DIR)/path_parser.o $(FAT16_OBJ) $(VFS_OBJ)
+$(KERNEL_BIN): $(KERNEL_ENTRY_OBJ) $(GDT_ASM_OBJ) $(GDT_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(PORTS_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ) $(BIN_DIR)/kheap.o $(BIN_DIR)/paging.o $(BIN_DIR)/serial.o $(BIN_DIR)/ata.o $(DISK_STREAM_OBJ) $(BIN_DIR)/string.o $(BIN_DIR)/path_parser.o $(FAT16_OBJ) $(VFS_OBJ) $(PANIC_OBJ) linker.ld
+	$(LD) $(LDFLAGS) -o $(KERNEL_BIN) $(KERNEL_ENTRY_OBJ) $(GDT_ASM_OBJ) $(GDT_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(PORTS_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ) $(BIN_DIR)/kheap.o $(BIN_DIR)/paging.o $(BIN_DIR)/serial.o $(BIN_DIR)/ata.o $(DISK_STREAM_OBJ) $(BIN_DIR)/string.o $(BIN_DIR)/path_parser.o $(FAT16_OBJ) $(VFS_OBJ) $(PANIC_OBJ)
 
 # Create OS image (bootloader + kernel)
 $(OS_IMAGE): $(BOOTLOADER_BIN) $(KERNEL_BIN)
