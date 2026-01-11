@@ -128,19 +128,31 @@ out:
 
 int fread(void* ptr, uint32_t size, uint32_t nmemb, int fd) {
     struct file_descriptor* desc = fs_get_descriptor(fd);
-    if (!desc) return -1;
+    if (!desc || !desc->filesystem->read) return -1;
     return desc->filesystem->read(desc->disk, desc->private, size, nmemb, (char*)ptr);
 }
 
-int fseek(int fd, uint32_t offset, FILE_SEEK_MODE whence) {
+int fseek(int fd, int offset, FILE_SEEK_MODE whence) {
     struct file_descriptor* desc = fs_get_descriptor(fd);
-    if (!desc) return -1;
+    if (!desc || !desc->filesystem->seek) return -1;
     return desc->filesystem->seek(desc->private, offset, whence);
+}
+
+int ftell(int fd) {
+    struct file_descriptor* desc = fs_get_descriptor(fd);
+    if (!desc || !desc->filesystem->tell) return -1;
+    return desc->filesystem->tell(desc->private);
+}
+
+int fstat(int fd, struct file_stat* stat) {
+    struct file_descriptor* desc = fs_get_descriptor(fd);
+    if (!desc || !desc->filesystem->stat) return -1;
+    return desc->filesystem->stat(desc->disk, desc->private, stat);
 }
 
 int fclose(int fd) {
     struct file_descriptor* desc = fs_get_descriptor(fd);
-    if (!desc) return -1;
+    if (!desc || !desc->filesystem->close) return -1;
     int res = desc->filesystem->close(desc->private);
     if (res == 0) {
         file_descriptors[desc->index - 1] = NULL;

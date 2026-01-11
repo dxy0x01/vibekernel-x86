@@ -186,15 +186,31 @@ void main() {
         file_entry->low_16_bits_first_cluster = 4; // FILE data starts at cluster 4
         file_entry->filesize = 18; 
         
-        ata_write_sector(1, dir_sec, dir_buf);
-        
-        // Prepare FILE data
+        // Prepare FILE data (across sector boundary if possible, but for now just larger)
         uint32_t file_sec = fat16_cluster_to_sector(&drive1, 4);
-        uint16_t* file_buf = (uint16_t*)kmalloc(512);
-        memset(file_buf, 0, 512);
-        memcpy(file_buf, "Recursive Success!", 18);
-        ata_write_sector(1, file_sec, file_buf);
+        char* large_buf = (char*)kmalloc(1024);
+        memset(large_buf, 'A', 1024); // Fill with 'A'
+        memcpy(large_buf, "Start of large file", 19);
+        memcpy(large_buf + 1000, "End of file", 11);
         
+        // Write two sectors for cluster 4 (assuming 512 byte sectors)
+        ata_write_sector(1, file_sec, (uint16_t*)large_buf);
+        ata_write_sector(1, file_sec + 1, (uint16_t*)(large_buf + 512));
+        
+        // Update FAT table to link cluster 4 -> 5 -> END
+        uint32_t fat_sec = ((struct fat_private*)drive1.fs_private)->bpb.reserved_sectors;
+        uint16_t* fat_buf = (uint16_t*)kmalloc(512);
+        ata_read_sector(1, fat_sec, fat_buf);
+        fat_buf[4] = 5;
+        fat_buf[5] = 0xFFFF;
+        ata_write_sector(1, fat_sec, fat_buf);
+        kfree(fat_buf);
+
+        file_entry->filesize = 1011; 
+        
+        // Write directory AFTER updating all entries
+        ata_write_sector(1, dir_sec, dir_buf);
+
         serial_print("Injection complete. Attempting to open 1:/DIR/TEST.TXT via VFS...\n");
         
         fs_init();
@@ -203,12 +219,48 @@ void main() {
         int fd = fopen("1:/DIR/TEST.TXT", "r");
         if (fd > 0) {
             serial_print("Opened successfully!\n");
-            char read_back[20];
-            memset(read_back, 0, 20);
-            fread(read_back, 1, 18, fd);
-            serial_print("Content: ");
+            char read_back[32];
+            
+            // Read start
+            memset(read_back, 0, 32);
+            fread(read_back, 1, 19, fd);
+            serial_print("Start Content: ");
             serial_print(read_back);
             serial_print("\n");
+
+            // Seek to near end (manual seek for now)
+            int sres = fseek(fd, 1000, FILE_SEEK_SET);
+            if (sres != 0) serial_print("FSEEK SET FAILED!\n");
+            memset(read_back, 0, 32);
+            fread(read_back, 1, 11, fd);
+            serial_print("End Content: ");
+            serial_print(read_back);
+            serial_print("\n");
+
+            // Test SEEK_CUR
+            fseek(fd, -11, FILE_SEEK_CUR);
+            memset(read_back, 0, 32);
+            fread(read_back, 1, 11, fd);
+            serial_print("Re-read End Content (CUR): ");
+            serial_print(read_back);
+            serial_print("\n");
+
+            // Test ftell
+            int pos = ftell(fd);
+            if (pos != 1011) serial_print("FTELL FAILED!\n");
+            else serial_print("FTELL SUCCESS!\n");
+
+            // Test fstat
+            struct file_stat stat;
+            if (fstat(fd, &stat) == 0) {
+                serial_print("FSTAT SUCCESS: Size=");
+                // Since I don't have a number printer, I'll just check if it's correct
+                if (stat.filesize == 1011) serial_print("Correct\n");
+                else serial_print("Incorrect\n");
+            } else {
+                serial_print("FSTAT FAILED!\n");
+            }
+
             fclose(fd);
         } else {
             serial_print("Failed to open 1:/DIR/TEST.TXT via VFS. Code: ");
@@ -228,6 +280,15 @@ void main() {
         } else {
             serial_print("VFS INCORRECTLY opened non-existent file!\n");
             fclose(fd_bad);
+        }
+
+        serial_print("Testing robustness: Opening directory 1:/DIR as a file...\n");
+        int fd_dir = fopen("1:/DIR", "r");
+        if (fd_dir < 0) {
+            serial_print("VFS correctly rejected opening directory as file.\n");
+        } else {
+            serial_print("VFS INCORRECTLY opened directory as file!\n");
+            fclose(fd_dir);
         }
     } else {
         serial_print("FAT16 Initialization FAILED! Code: ");

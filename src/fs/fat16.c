@@ -6,16 +6,18 @@
 #include "../string/string.h"
 #include <stddef.h>
 
-#include <stddef.h>
+void* fat16_open(struct disk* disk, struct path_part* path, FILE_MODE mode);
 
 struct filesystem* fat16_init_vfs() {
     static struct filesystem fat16_fs = {
         .name = "FAT16",
         .resolve = fat16_resolve,
-        .open = fat16_open_vfs,
+        .open = fat16_open,
         .read = (FS_READ_FUNCTION)fat16_read,
         .seek = (FS_SEEK_FUNCTION)fat16_seek,
-        .close = (FS_CLOSE_FUNCTION)fat16_close
+        .tell = (FS_TELL_FUNCTION)fat16_tell,
+        .close = (FS_CLOSE_FUNCTION)fat16_close,
+        .stat = (FS_STAT_FUNCTION)fat16_stat
     };
     return &fat16_fs;
 }
@@ -145,17 +147,7 @@ static int fat16_get_directory_entry(struct disk* disk, uint32_t cluster, const 
     return -4; // Not found
 }
 
-struct fat_file_descriptor* fat16_open(struct disk* disk, const char* filename) {
-    struct fat_directory_item item;
-    if (fat16_get_directory_entry(disk, 0, filename, &item) != 0) {
-        return NULL;
-    }
-    
-    struct fat_file_descriptor* desc = kmalloc(sizeof(struct fat_file_descriptor));
-    desc->item = item;
-    desc->pos = 0;
-    return desc;
-}
+// legacy fat16_open removed
 
 int fat16_close(void* private) {
     kfree(private);
@@ -170,18 +162,47 @@ int fat16_read(struct disk* disk, void* private_data, uint32_t size, uint32_t nm
         total_to_read = desc->item.filesize - desc->pos;
     }
     
+    if (total_to_read == 0) return 0;
+
     uint32_t total_read = 0;
     uint32_t cluster_size = private->bpb.sectors_per_cluster * private->bpb.bytes_per_sector;
     
+    // Efficient cluster lookup: Use cache if possible
+    uint32_t current_cluster;
+    uint32_t start_cluster;
+    uint32_t start_pos;
+
+    if (desc->pos >= desc->last_cluster_pos) {
+        start_cluster = desc->last_cluster;
+        start_pos = desc->last_cluster_pos;
+    } else {
+        start_cluster = desc->item.low_16_bits_first_cluster;
+        start_pos = 0;
+    }
+
+    current_cluster = fat16_get_cluster_for_offset(disk, start_cluster, desc->pos - start_pos);
+    if (current_cluster >= FAT16_CLUSTER_RESERVED_MIN) return 0;
+
+    // Update cache
+    desc->last_cluster = current_cluster;
+    desc->last_cluster_pos = (desc->pos / cluster_size) * cluster_size;
+
     while (total_read < total_to_read) {
         uint32_t offset_in_file = desc->pos + total_read;
-        uint32_t current_cluster = fat16_get_cluster_for_offset(disk, desc->item.low_16_bits_first_cluster, offset_in_file);
+        uint32_t offset_in_cluster = offset_in_file % cluster_size;
         
+        // Check if we need to advance to the next cluster
+        if (total_read > 0 && offset_in_cluster == 0) {
+            current_cluster = fat16_get_fat_entry(disk, current_cluster);
+            // Update cache as we go
+            desc->last_cluster = current_cluster;
+            desc->last_cluster_pos = offset_in_file;
+        }
+
         if (current_cluster >= FAT16_CLUSTER_RESERVED_MIN) {
-            break; // Something went wrong or end of file
+            break; // End of chain or error
         }
         
-        uint32_t offset_in_cluster = offset_in_file % cluster_size;
         uint32_t abs_sector = fat16_cluster_to_sector(disk, current_cluster);
         uint32_t abs_pos = (abs_sector * private->bpb.bytes_per_sector) + offset_in_cluster;
         
@@ -202,13 +223,48 @@ int fat16_read(struct disk* disk, void* private_data, uint32_t size, uint32_t nm
     return total_read / size;
 }
 
-int fat16_seek(void* private, uint32_t offset, FILE_SEEK_MODE whence) {
+int fat16_seek(void* private, int offset, FILE_SEEK_MODE whence) {
     struct fat_file_descriptor* desc = (struct fat_file_descriptor*)private;
-    // Basic seek implementation
-    desc->pos = offset;
+    uint32_t new_pos = desc->pos;
+
+    switch (whence) {
+        case FILE_SEEK_SET:
+            new_pos = offset;
+            break;
+        case FILE_SEEK_CUR:
+            new_pos += offset;
+            break;
+        case FILE_SEEK_END:
+            new_pos = desc->item.filesize + offset;
+            break;
+    }
+
+    if (new_pos > desc->item.filesize) {
+        return -1;
+    }
+
+    desc->pos = new_pos;
     return 0;
 }
-void* fat16_open_vfs(struct disk* disk, struct path_part* path, FILE_MODE mode) {
+
+int fat16_tell(void* private) {
+    struct fat_file_descriptor* desc = (struct fat_file_descriptor*)private;
+    return desc->pos;
+}
+
+int fat16_stat(struct disk* disk, void* private, struct file_stat* stat) {
+    struct fat_file_descriptor* desc = (struct fat_file_descriptor*)private;
+    stat->filesize = desc->item.filesize;
+    stat->flags = 0;
+    if (desc->item.attribute & FAT_FILE_READ_ONLY) stat->flags |= FILE_STAT_READ_ONLY;
+    if (desc->item.attribute & FAT_FILE_HIDDEN) stat->flags |= FILE_STAT_HIDDEN;
+    if (desc->item.attribute & FAT_FILE_SYSTEM) stat->flags |= FILE_STAT_SYSTEM;
+    if (desc->item.attribute & FAT_FILE_VOLUME_LABEL) stat->flags |= FILE_STAT_VOLUME_LABEL;
+    if (desc->item.attribute & FAT_FILE_SUBDIRECTORY) stat->flags |= FILE_STAT_DIRECTORY;
+    if (desc->item.attribute & FAT_FILE_ARCHIVE) stat->flags |= FILE_STAT_ARCHIVE;
+    return 0;
+}
+void* fat16_open(struct disk* disk, struct path_part* path, FILE_MODE mode) {
     if (mode != FILE_MODE_READ) return NULL;
     
     struct fat_directory_item item;
@@ -228,10 +284,15 @@ void* fat16_open_vfs(struct disk* disk, struct path_part* path, FILE_MODE mode) 
         current_part = current_part->next;
     }
     
-    // Last part found, create descriptor
+    // Last part found. Ensure it's not a directory if we are opening a file.
+    if (item.attribute & FAT_FILE_SUBDIRECTORY) return NULL;
+    
+    // Create descriptor
     struct fat_file_descriptor* desc = kmalloc(sizeof(struct fat_file_descriptor));
     desc->item = item;
     desc->pos = 0;
+    desc->last_cluster = item.low_16_bits_first_cluster;
+    desc->last_cluster_pos = 0;
     return desc;
 }
 

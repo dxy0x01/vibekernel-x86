@@ -78,17 +78,21 @@ struct fat_private {
 struct fat_file_descriptor {
     struct fat_directory_item item;
     uint32_t pos;
+    uint32_t last_cluster;
+    uint32_t last_cluster_pos;
 };
 
 #include "file.h"
 
 int fat16_resolve(struct disk* disk);
-void* fat16_open_vfs(struct disk* disk, struct path_part* path, FILE_MODE mode);
+void* fat16_open(struct disk* disk, struct path_part* path, FILE_MODE mode);
 struct filesystem* fat16_init_vfs();
 
 int fat16_read(struct disk* disk, void* private, uint32_t size, uint32_t nmemb, char* out);
-int fat16_seek(void* private, uint32_t offset, FILE_SEEK_MODE whence);
+int fat16_seek(void* private, int offset, FILE_SEEK_MODE whence);
+int fat16_tell(void* private);
 int fat16_close(void* private);
+int fat16_stat(struct disk* disk, void* private, struct file_stat* stat);
 
 // For Testing
 uint32_t fat16_cluster_to_sector(struct disk* disk, uint32_t cluster);
