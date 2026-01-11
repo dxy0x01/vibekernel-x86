@@ -1,6 +1,7 @@
 #include "../drivers/screen.h"
 #include "../cpu/isr.h"
 #include "../drivers/serial.h"
+#include "../drivers/ata.h"
 
 #include "../memory/heap/kheap.h"
 #include "../memory/paging/paging.h"
@@ -79,7 +80,28 @@ void main() {
     // Check bits 0-11 are zero
     if (((uint32_t)ptr1 & 0xFFF) == 0) {
         print_string("Alignment Success!\n");
+        serial_print("Alignment Success!\n");
     } else {
         print_string("Alignment FAILED!\n");
+        serial_print("Alignment FAILED!\n");
+    }
+
+    // Test ATA Disk Read
+    serial_print("Testing ATA Disk Read (Sector 0)...\n");
+    uint16_t* disk_buf = (uint16_t*)kmalloc(512);
+    if (ata_read_sector(0, disk_buf) == 0) {
+        serial_print("Disk Read Successful! First 16 bytes of Sector 0:\n");
+        uint8_t* byte_buf = (uint8_t*)disk_buf;
+        for (int i = 0; i < 16; i++) {
+            // Very basic hex-ish printing for serial
+            char high = (byte_buf[i] >> 4) & 0x0F;
+            char low = byte_buf[i] & 0x0F;
+            serial_putc(high < 10 ? high + '0' : high - 10 + 'A');
+            serial_putc(low < 10 ? low + '0' : low - 10 + 'A');
+            serial_putc(' ');
+        }
+        serial_putc('\n');
+    } else {
+        serial_print("Disk Read FAILED!\n");
     }
 }

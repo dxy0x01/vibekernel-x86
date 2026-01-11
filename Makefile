@@ -84,6 +84,10 @@ $(PORTS_OBJ): $(PORTS_C) | $(BIN_DIR)
 $(BIN_DIR)/serial.o: $(DRIVERS_DIR)/serial.c | $(BIN_DIR)
 	$(CC) $(CFLAGS) $(DRIVERS_DIR)/serial.c -o $(BIN_DIR)/serial.o
 
+# Compile ATA Driver
+$(BIN_DIR)/ata.o: $(DRIVERS_DIR)/ata.c | $(BIN_DIR)
+	$(CC) $(CFLAGS) $(DRIVERS_DIR)/ata.c -o $(BIN_DIR)/ata.o
+
 # Compile IDT
 $(IDT_OBJ): $(IDT_C) | $(BIN_DIR)
 	$(CC) $(CFLAGS) $(IDT_C) -o $(IDT_OBJ)
@@ -93,8 +97,8 @@ $(ISR_OBJ): $(ISR_C) | $(BIN_DIR)
 	$(CC) $(CFLAGS) $(ISR_C) -o $(ISR_OBJ)
 
 # Link kernel
-$(KERNEL_BIN): $(KERNEL_ENTRY_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(PORTS_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ) $(BIN_DIR)/kheap.o $(BIN_DIR)/paging.o $(BIN_DIR)/serial.o linker.ld
-	$(LD) $(LDFLAGS) -o $(KERNEL_BIN) $(KERNEL_ENTRY_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(PORTS_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ) $(BIN_DIR)/kheap.o $(BIN_DIR)/paging.o $(BIN_DIR)/serial.o
+$(KERNEL_BIN): $(KERNEL_ENTRY_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(PORTS_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ) $(BIN_DIR)/kheap.o $(BIN_DIR)/paging.o $(BIN_DIR)/serial.o $(BIN_DIR)/ata.o linker.ld
+	$(LD) $(LDFLAGS) -o $(KERNEL_BIN) $(KERNEL_ENTRY_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(PORTS_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ) $(BIN_DIR)/kheap.o $(BIN_DIR)/paging.o $(BIN_DIR)/serial.o $(BIN_DIR)/ata.o
 
 # Create OS image (bootloader + kernel)
 $(OS_IMAGE): $(BOOTLOADER_BIN) $(KERNEL_BIN)
@@ -109,4 +113,4 @@ clean:
 	@echo "Cleaned build artifacts"
 
 run: all
-	$(QEMU) -drive format=raw,file=$(OS_IMAGE) -monitor stdio
+	$(QEMU) -drive format=raw,file=$(OS_IMAGE) -serial mon:stdio
