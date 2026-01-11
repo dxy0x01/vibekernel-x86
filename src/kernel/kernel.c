@@ -160,6 +160,15 @@ void main() {
     }
     command_register("version", "Display kernel version", version_handler);
 
+    void echo_handler(int argc, char** argv) {
+        for (int i = 1; i < argc; i++) {
+            print_string(argv[i]);
+            if (i < argc - 1) print_string(" ");
+        }
+        print_string("\n");
+    }
+    command_register("echo", "Print arguments to the screen", echo_handler);
+
     print_string("Type 'help' for a list of commands.\n");
 
     char cmd_buf[128];
