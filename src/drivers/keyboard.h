@@ -11,5 +11,6 @@
 void keyboard_init();
 void keyboard_handler(registers_t *regs);
 char keyboard_getc();
+void keyboard_push(char c);
 
 #endif

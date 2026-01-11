@@ -69,6 +69,15 @@ void main() {
     command_register("version", "Display kernel version", version_handler);
     command_register("echo", "Print arguments to the screen", echo_handler);
 
+    void print_handler(int argc, char** argv) {
+        for (int i = 1; i < argc; i++) {
+            print_string(argv[i]);
+            if (i < argc - 1) print_string(" ");
+        }
+        print_string("\n");
+    }
+    command_register("print", "Display text on the screen", print_handler);
+
     char echo_msg[] = "echo VibeKernel is ready.";
     command_run(echo_msg);
     

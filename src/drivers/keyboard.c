@@ -1,10 +1,8 @@
 #include "keyboard.h"
+#include "ps2.h"
 #include "ports.h"
 #include "screen.h"
 #include "../string/string.h"
-
-#define KEYBOARD_DATA_PORT 0x60
-#define KEYBOARD_STATUS_PORT 0x64
 
 #define BUFFER_SIZE 256
 static char keyboard_buffer[BUFFER_SIZE];
@@ -35,11 +33,11 @@ static const char scancode_ascii_shift[] = {
 };
 
 void keyboard_init() {
-    // Basic initialization if needed
+    ps2_init();
 }
 
 void keyboard_handler(registers_t *regs) {
-    uint8_t scancode = port_byte_in(KEYBOARD_DATA_PORT);
+    uint8_t scancode = ps2_read_data();
     
     if (scancode & 0x80) {
         // Key release
@@ -77,4 +75,13 @@ char keyboard_getc() {
     char c = keyboard_buffer[buffer_tail];
     buffer_tail = (buffer_tail + 1) % BUFFER_SIZE;
     return c;
+}
+
+void keyboard_push(char c) {
+    if (c == 0) return;
+    int next = (buffer_head + 1) % BUFFER_SIZE;
+    if (next != buffer_tail) {
+        keyboard_buffer[buffer_head] = c;
+        buffer_head = next;
+    }
 }
