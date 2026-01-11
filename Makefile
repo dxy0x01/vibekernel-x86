@@ -16,6 +16,7 @@ BOOT_DIR = $(SRC_DIR)/boot
 KERNEL_DIR = $(SRC_DIR)/kernel
 DRIVERS_DIR = $(SRC_DIR)/drivers
 CPU_DIR = $(SRC_DIR)/cpu
+MEMORY_DIR = $(SRC_DIR)/memory
 BIN_DIR = bin
 
 # Files
@@ -67,9 +68,13 @@ $(KERNEL_OBJ): $(KERNEL_C) | $(BIN_DIR)
 $(SCREEN_OBJ): $(SCREEN_C) | $(BIN_DIR)
 	$(CC) $(CFLAGS) $(SCREEN_C) -o $(SCREEN_OBJ)
 
-# Compile Memory Manager
-$(BIN_DIR)/mem.o: $(KERNEL_DIR)/mem.c | $(BIN_DIR)
-	$(CC) $(CFLAGS) $(KERNEL_DIR)/mem.c -o $(BIN_DIR)/mem.o
+# Compile Heap
+$(BIN_DIR)/kheap.o: $(MEMORY_DIR)/heap/kheap.c | $(BIN_DIR)
+	$(CC) $(CFLAGS) $(MEMORY_DIR)/heap/kheap.c -o $(BIN_DIR)/kheap.o
+
+# Compile Paging
+$(BIN_DIR)/paging.o: $(MEMORY_DIR)/paging/paging.c | $(BIN_DIR)
+	$(CC) $(CFLAGS) $(MEMORY_DIR)/paging/paging.c -o $(BIN_DIR)/paging.o
 
 # Compile Ports Driver
 $(PORTS_OBJ): $(PORTS_C) | $(BIN_DIR)
@@ -84,8 +89,8 @@ $(ISR_OBJ): $(ISR_C) | $(BIN_DIR)
 	$(CC) $(CFLAGS) $(ISR_C) -o $(ISR_OBJ)
 
 # Link kernel
-$(KERNEL_BIN): $(KERNEL_ENTRY_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(PORTS_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ) $(BIN_DIR)/mem.o linker.ld
-	$(LD) $(LDFLAGS) -o $(KERNEL_BIN) $(KERNEL_ENTRY_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(PORTS_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ) $(BIN_DIR)/mem.o
+$(KERNEL_BIN): $(KERNEL_ENTRY_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(PORTS_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ) $(BIN_DIR)/kheap.o $(BIN_DIR)/paging.o linker.ld
+	$(LD) $(LDFLAGS) -o $(KERNEL_BIN) $(KERNEL_ENTRY_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(PORTS_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ) $(BIN_DIR)/kheap.o $(BIN_DIR)/paging.o
 
 # Create OS image (bootloader + kernel)
 $(OS_IMAGE): $(BOOTLOADER_BIN) $(KERNEL_BIN)

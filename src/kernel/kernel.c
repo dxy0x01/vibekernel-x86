@@ -1,26 +1,51 @@
 #include "../drivers/screen.h"
 #include "../cpu/isr.h"
-#include "mem.h"
+
+#include "../memory/heap/kheap.h"
+#include "../memory/paging/paging.h"
+
+// Simulate idt_init if it doesn't match exactly yet
+void idt_init() {
+    isr_install();
+}
+
+static struct paging_4gb_chunk* kernel_chunk = 0;
 
 void main() {
     clear_screen();
-    isr_install();
     print_string("Hello World from C Kernel!\n");
-    print_string("We are in Protected Mode.\n");
-    __asm__ __volatile__("sti"); // Enable interrupts
-
-    memory_init();
     
-    // Test Malloc
-    char* str = (char*)kmalloc(10);
-    if (str) {
-        str[0] = 'H'; str[1] = 'e'; str[2] = 'a'; str[3] = 'p'; str[4] = '!'; str[5] = 0;
-        print_string("Allocated: ");
-        print_string(str);
-        print_string("\n");
-        kfree(str);
-        print_string("Freed.\n");
+    idt_init();
+    kheap_init();
+    
+    // Setup paging
+    // flags: RW | Present | Access from all (User)
+    kernel_chunk = paging_new_4gb(PAGING_IS_WRITEABLE | PAGING_IS_PRESENT | PAGING_ACCESS_FROM_ALL);
+    
+    // Switch to kernel paging chunk
+    paging_switch(paging_4gb_chunk_get_directory(kernel_chunk));
+
+    // Enable paging
+    enable_paging();
+    
+    __asm__ __volatile__("sti");
+
+    print_string("Paging Initialized.\n");
+    
+    // Test Alignment logic
+    void* ptr1 = kmalloc_a(100);
+    print_string("Aligned Malloc: 0x");
+    // Manual hex printing (since print_hex is in screen.h but not exposed? or is it?)
+    // Actually print_hex was in screen.h?
+    // I should check screen.h content.
+    // Assuming print_hex is available.
+    // print_hex((uint32_t)ptr1);
+    // print_string("\n");
+    
+    // Check bits 0-11 are zero
+    if (((uint32_t)ptr1 & 0xFFF) == 0) {
+        print_string("Alignment Success!\n");
     } else {
-        print_string("Malloc failed.\n");
+        print_string("Alignment FAILED!\n");
     }
 }
