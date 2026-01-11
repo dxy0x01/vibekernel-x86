@@ -27,7 +27,7 @@ $(BIN_DIR):
 
 # Assemble bootloader
 $(BOOTLOADER_BIN): $(BOOTLOADER) | $(BIN_DIR)
-	$(ASM) -f bin $(BOOTLOADER) -o $(BOOTLOADER_BIN)
+	$(ASM) -f bin -I src/boot/ $(BOOTLOADER) -o $(BOOTLOADER_BIN)
 
 # Create OS image (bootloader + data + padding)
 $(OS_IMAGE): $(BOOTLOADER_BIN) $(DATA_FILE)
