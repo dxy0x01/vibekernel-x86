@@ -141,12 +141,12 @@ void main() {
     set_idt();
     __asm__ __volatile__("sti");
 
-    // Run legacy hardware/fs tests
-    kernel_tests();
+    // Run legacy hardware/fs tests (Disabled for clean boot)
+    // kernel_tests();
 
     // Testing First User Process Application
-    serial_print("Loading First User Process (blank.bin)...\n");
-    print_string("Loading blank.bin...\n");
+    serial_print("VibeKernel: Loading First User Process (BLANK.BIN)...\n");
+    print_string("Loading BLANK.BIN...\n");
 
     struct process* p_blank = NULL;
     if (process_load("1:/BLANK.BIN", &p_blank) != 0) {
