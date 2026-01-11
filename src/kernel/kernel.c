@@ -15,6 +15,8 @@
 #include "../fs/fat16.h"
 #include "../fs/file.h"
 #include "panic.h"
+#include "../task/task.h"
+#include "../task/process.h"
 
 // Simulate idt_init if it doesn't match exactly yet
 void idt_init() {
@@ -297,6 +299,19 @@ void main() {
         uint32_t val = (fat_res < 0) ? -fat_res : fat_res;
         serial_putc(val + '0');
         serial_print("\n");
+    }
+
+    // Testing Task Foundations
+    serial_print("Testing Task Foundations...\n");
+    struct process dummy_proc;
+    memset(&dummy_proc, 0, sizeof(dummy_proc));
+    strcpy(dummy_proc.name, "DUMMY");
+    
+    struct task* t = task_new(&dummy_proc);
+    if (t && task_current() == t) {
+        serial_print("Task allocation SUCCESS!\n");
+    } else {
+        serial_print("Task allocation FAILED!\n");
     }
 
     serial_print("Kernel execution finished. Testing panic...\n");
