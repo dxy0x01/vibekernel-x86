@@ -10,6 +10,8 @@
 
 #include "../cpu/gdt.h"
 
+#include "../drivers/disk_stream.h"
+
 // Simulate idt_init if it doesn't match exactly yet
 void idt_init() {
     isr_install();
@@ -94,52 +96,37 @@ void main() {
         serial_print("Alignment FAILED!\n");
     }
 
-    // Test ATA Disk Read/Write/Identify
-    serial_print("Testing Robust ATA Disk Driver...\n");
+    // Test Disk Stream
+    serial_print("Testing Disk Stream Layer...\n");
     
-    if (ata_identify() == 0) {
-        serial_print("Drive IDENTIFY Successful!\n");
-    } else {
-        serial_print("Drive IDENTIFY FAILED!\n");
-    }
+    // Write pattern to Sector 2 using raw ATA first
+    uint16_t* write_buf = (uint16_t*)kmalloc(512);
+    for(int i=0; i<256; i++) write_buf[i] = 0x55AA; // Swap pattern for variety
+    ata_write_sector(2, write_buf);
 
-    uint16_t* test_buffer = (uint16_t*)kmalloc(512);
-    // Fill with pattern
-    for(int i=0; i<256; i++) test_buffer[i] = 0xAA55; // Distinct pattern
+    struct disk_stream* stream = diskstream_new(0);
+    diskstream_seek(stream, 512 * 2); // Seek to Sector 2
 
-    serial_print("Writing pattern 0xAA55 to Sector 2...\n");
-    int res = ata_write_sector(2, test_buffer);
-    if (res == 0) {
-        serial_print("Write Successful.\n");
-    } else {
-        serial_print("Write FAILED! Code: ");
-        serial_putc((res*-1) + '0');
-        serial_print("\n");
-    }
-
-    // Clear buffer
-    for(int i=0; i<256; i++) test_buffer[i] = 0;
-
-    serial_print("Reading back Sector 2...\n");
-    res = ata_read_sector(2, test_buffer);
-    if (res == 0) {
-        if (test_buffer[0] == 0xAA55) {
-            serial_print("Verification Success: Read back 0xAA55 from Sector 2!\n");
+    uint16_t read_val = 0;
+    if (diskstream_read(stream, &read_val, 2) == 0) {
+        if (read_val == 0x55AA) {
+            serial_print("Disk Stream Verification Success: Read back 0x55AA from offset 1024!\n");
         } else {
-            serial_print("Verification FAILED: Pattern mismatch! Read: ");
-            // Print first word
-            uint16_t val = test_buffer[0];
-            for(int j=0; j<4; j++) {
-                char h = (val >> (12-j*4)) & 0xF;
-                serial_putc(h < 10 ? h + '0' : h - 10 + 'A');
-            }
-            serial_print("\n");
+            serial_print("Disk Stream Verification FAILED: Read wrong value!\n");
         }
     } else {
-        serial_print("Read back FAILED! Code: ");
-        serial_putc((res*-1) + '0');
-        serial_print("\n");
+        serial_print("Disk Stream Read FAILED!\n");
     }
+
+    // Test unaligned read across sector boundary
+    // Offset 510 (last 2 bytes of sector 1) to offset 514 (first 2 bytes of sector 2)
+    diskstream_seek(stream, 512 * 2 - 2); 
+    uint32_t cross_val = 0;
+    if (diskstream_read(stream, &cross_val, 4) == 0) {
+        serial_print("Cross-sector read successful.\n");
+    }
+
+    diskstream_close(stream);
 
     // Test Path Parser
     serial_print("Testing Path Parser...\n");

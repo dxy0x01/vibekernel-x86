@@ -36,6 +36,10 @@ ISR_C = $(CPU_DIR)/isr.c
 ISR_OBJ = $(BIN_DIR)/isr.o
 INTERRUPT_ASM = $(CPU_DIR)/interrupt.asm
 INTERRUPT_OBJ = $(BIN_DIR)/interrupt.o
+DISK_STREAM_C = $(DRIVERS_DIR)/disk_stream.c
+DISK_STREAM_OBJ = $(BIN_DIR)/disk_stream.o
+GDT_C = $(CPU_DIR)/gdt.c
+DISK_STREAM_OBJ = $(BIN_DIR)/disk_stream.o
 GDT_C = $(CPU_DIR)/gdt.c
 GDT_OBJ = $(BIN_DIR)/gdt.o
 GDT_ASM = $(CPU_DIR)/gdt.asm
@@ -92,6 +96,10 @@ $(BIN_DIR)/serial.o: $(DRIVERS_DIR)/serial.c | $(BIN_DIR)
 $(BIN_DIR)/ata.o: $(DRIVERS_DIR)/ata.c | $(BIN_DIR)
 	$(CC) $(CFLAGS) $(DRIVERS_DIR)/ata.c -o $(BIN_DIR)/ata.o
 
+# Compile Disk Stream
+$(DISK_STREAM_OBJ): $(DISK_STREAM_C) | $(BIN_DIR)
+	$(CC) $(CFLAGS) $(DISK_STREAM_C) -o $(DISK_STREAM_OBJ)
+
 # Compile String Utility
 $(BIN_DIR)/string.o: $(SRC_DIR)/string/string.c | $(BIN_DIR)
 	$(CC) $(CFLAGS) $(SRC_DIR)/string/string.c -o $(BIN_DIR)/string.o
@@ -116,8 +124,8 @@ $(GDT_ASM_OBJ): $(GDT_ASM) | $(BIN_DIR)
 	$(ASM) -f elf $(GDT_ASM) -o $(GDT_ASM_OBJ)
 
 # Link kernel
-$(KERNEL_BIN): $(KERNEL_ENTRY_OBJ) $(GDT_ASM_OBJ) $(GDT_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(PORTS_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ) $(BIN_DIR)/kheap.o $(BIN_DIR)/paging.o $(BIN_DIR)/serial.o $(BIN_DIR)/ata.o $(BIN_DIR)/string.o $(BIN_DIR)/path_parser.o linker.ld
-	$(LD) $(LDFLAGS) -o $(KERNEL_BIN) $(KERNEL_ENTRY_OBJ) $(GDT_ASM_OBJ) $(GDT_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(PORTS_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ) $(BIN_DIR)/kheap.o $(BIN_DIR)/paging.o $(BIN_DIR)/serial.o $(BIN_DIR)/ata.o $(BIN_DIR)/string.o $(BIN_DIR)/path_parser.o
+$(KERNEL_BIN): $(KERNEL_ENTRY_OBJ) $(GDT_ASM_OBJ) $(GDT_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(PORTS_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ) $(BIN_DIR)/kheap.o $(BIN_DIR)/paging.o $(BIN_DIR)/serial.o $(BIN_DIR)/ata.o $(DISK_STREAM_OBJ) $(BIN_DIR)/string.o $(BIN_DIR)/path_parser.o linker.ld
+	$(LD) $(LDFLAGS) -o $(KERNEL_BIN) $(KERNEL_ENTRY_OBJ) $(GDT_ASM_OBJ) $(GDT_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(PORTS_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ) $(BIN_DIR)/kheap.o $(BIN_DIR)/paging.o $(BIN_DIR)/serial.o $(BIN_DIR)/ata.o $(DISK_STREAM_OBJ) $(BIN_DIR)/string.o $(BIN_DIR)/path_parser.o
 
 # Create OS image (bootloader + kernel)
 $(OS_IMAGE): $(BOOTLOADER_BIN) $(KERNEL_BIN)
