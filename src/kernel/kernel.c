@@ -154,7 +154,7 @@ void main() {
     }
 
     struct task* t_blank = task_new(p_blank);
-    t_blank->regs.eip = (uint32_t)p_blank->ptr;
+    t_blank->regs.eip = 0x400000;
 
     task_switch(t_blank);
 

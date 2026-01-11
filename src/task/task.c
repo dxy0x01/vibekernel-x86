@@ -2,6 +2,7 @@
 #include "../memory/heap/kheap.h"
 #include "../string/string.h"
 #include "../kernel/panic.h"
+#include "process.h"
 #include <stddef.h>
 
 struct task* current_task = NULL;
@@ -33,7 +34,14 @@ int task_init(struct task* task, struct process* process) {
     task->regs.esp = stack_top;
     task->regs.cs = 0x1B; // User Code (0x18 | 3)
     task->regs.eflags = 0x202; // IF | Reserved
-    
+
+    // Map user stack in the process's page directory
+    // For now, identity map it but with User access
+    uint32_t stack_page = (uint32_t)task->user_stack & 0xFFFFF000;
+    for (uint32_t i = 0; i < 16384; i += PAGING_PAGE_SIZE) {
+        paging_set(process->paging_chunk->directory_entry, (void*)(stack_page + i), (stack_page + i) | PAGING_IS_PRESENT | PAGING_IS_WRITEABLE | PAGING_ACCESS_FROM_ALL);
+    }
+
     return 0;
 }
 
@@ -78,6 +86,7 @@ void task_free(struct task* task) {
 extern tss_entry_t tss_entry;
 void task_switch(struct task* task) {
     current_task = task;
+    paging_switch(task->process->paging_chunk->directory_entry);
     tss_entry.esp0 = (uint32_t)task->kstack + 16383;
     task_return(&task->regs);
 }

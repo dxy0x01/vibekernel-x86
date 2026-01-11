@@ -18,13 +18,17 @@ struct paging_4gb_chunk* paging_new_4gb(uint8_t flags)
     }
 
     // 3. Identity Map First 64MB (Kernel, Stack, Video, Heap, BIOS)
-    // Map 16 Page Tables (4MB each)
+    // We map this with provided flags (usually present/writeable)
+    // BUT we don't necessarily want User access for all of it.
+    // However, for now, let's keep it simple and use provided flags.
     for (int i = 0; i < 16; i++) {
         uint32_t* table = kmalloc_a(sizeof(uint32_t) * PAGING_TOTAL_ENTRIES_PER_TABLE_SIZE);
         for (int b = 0; b < PAGING_TOTAL_ENTRIES_PER_TABLE_SIZE; b++) {
             table[b] = ((uint32_t)i * PAGING_TOTAL_ENTRIES_PER_TABLE_SIZE * PAGING_PAGE_SIZE + (b * PAGING_PAGE_SIZE)) | flags;
         }
-        directory[i] = (uint32_t)table | flags | PAGING_IS_WRITEABLE;
+        // The PDE itself should allow User access so that PTEs can decide.
+        // We always add PAGING_ACCESS_FROM_ALL to the PDE.
+        directory[i] = (uint32_t)table | flags | PAGING_IS_WRITEABLE | PAGING_ACCESS_FROM_ALL;
     }
 
     struct paging_4gb_chunk* chunk_4gb = kmalloc(sizeof(struct paging_4gb_chunk));
@@ -88,8 +92,8 @@ int paging_set(uint32_t* directory, void* virt, uint32_t val)
             table[i] = 0;
         }
 
-        // Add the table to the directory (Use flags from caller? No, val contains flags for PET)
-        // Usually PDEs share some common flags (Present | RW | User)
+        // Add the table to the directory.
+        // We set PAGING_ACCESS_FROM_ALL here so that individual PTEs can control access.
         directory[directory_index] = (uint32_t)table | PAGING_IS_PRESENT | PAGING_IS_WRITEABLE | PAGING_ACCESS_FROM_ALL;
     }
 

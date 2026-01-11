@@ -61,7 +61,7 @@ int process_load(const char* filename, struct process** process) {
     }
 
     proc->size = stat.filesize;
-    proc->ptr = kmalloc(proc->size);
+    proc->ptr = kmalloc_a(proc->size);
     if (!proc->ptr) {
         res = -1;
         goto out;
@@ -73,6 +73,24 @@ int process_load(const char* filename, struct process** process) {
     }
 
     fclose(fd);
+
+    // Initial paging setup for process
+    proc->paging_chunk = paging_new_4gb(PAGING_IS_PRESENT | PAGING_IS_WRITEABLE);
+    if (!proc->paging_chunk) {
+        res = -1;
+        goto out;
+    }
+
+    // Map user binary to 0x400000
+    // We map it page by page
+    for (int i = 0; i < proc->size; i += PAGING_PAGE_SIZE) {
+        uint32_t val = ((uint32_t)proc->ptr + i) | PAGING_IS_PRESENT | PAGING_IS_WRITEABLE | PAGING_ACCESS_FROM_ALL;
+        paging_set(proc->paging_chunk->directory_entry, (void*)(0x400000 + i), val);
+    }
+
+    // Map VGA memory for verification (0xB8000)
+    paging_set(proc->paging_chunk->directory_entry, (void*)0xB8000, 0xB8000 | PAGING_IS_PRESENT | PAGING_IS_WRITEABLE | PAGING_ACCESS_FROM_ALL);
+
     *process = proc;
 
 out:
