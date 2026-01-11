@@ -34,6 +34,7 @@ static const char scancode_ascii_shift[] = {
 
 void keyboard_init() {
     ps2_init();
+    register_interrupt_handler(33, keyboard_handler);
 }
 
 void keyboard_handler(registers_t *regs) {

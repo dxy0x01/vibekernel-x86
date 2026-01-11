@@ -21,9 +21,12 @@ SECTIONS
 
     .bss : ALIGN(4)
     {
+        _bss_start = .;
         *(COMMON)
         *(.bss)
+        _bss_end = .;
     }
 
+    _end = .;
     end = .;
 }
