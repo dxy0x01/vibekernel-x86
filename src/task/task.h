@@ -37,5 +37,7 @@ struct task* task_current();
 void task_free(struct task* task);
 void task_return(struct registers* regs);
 void task_switch(struct task* task);
+int task_copy_string_from_user(struct task* task, void* virtual, char* phys, int max);
+uint32_t task_get_stack_item(struct task* task, int index);
 
 #endif

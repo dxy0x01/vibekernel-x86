@@ -90,3 +90,32 @@ void task_switch(struct task* task) {
     tss_entry.esp0 = (uint32_t)task->kstack + 16383;
     task_return(&task->regs);
 }
+
+int task_copy_string_from_user(struct task* task, void* virtual, char* phys, int max) {
+    if (max <= 0) return -1;
+
+    uint32_t* old_directory = task_current()->process->paging_chunk->directory_entry;
+    paging_switch(task->process->paging_chunk->directory_entry);
+
+    char* v = (char*)virtual;
+    int i = 0;
+    for (i = 0; i < max - 1; i++) {
+        phys[i] = v[i];
+        if (v[i] == '\0') break;
+    }
+    phys[i] = '\0';
+
+    paging_switch(old_directory);
+    return i;
+}
+
+uint32_t task_get_stack_item(struct task* task, int index) {
+    uint32_t* old_directory = task_current()->process->paging_chunk->directory_entry;
+    paging_switch(task->process->paging_chunk->directory_entry);
+
+    uint32_t* sp = (uint32_t*)task->regs.esp;
+    uint32_t item = sp[index];
+
+    paging_switch(old_directory);
+    return item;
+}
