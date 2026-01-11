@@ -67,6 +67,10 @@ $(KERNEL_OBJ): $(KERNEL_C) | $(BIN_DIR)
 $(SCREEN_OBJ): $(SCREEN_C) | $(BIN_DIR)
 	$(CC) $(CFLAGS) $(SCREEN_C) -o $(SCREEN_OBJ)
 
+# Compile Memory Manager
+$(BIN_DIR)/mem.o: $(KERNEL_DIR)/mem.c | $(BIN_DIR)
+	$(CC) $(CFLAGS) $(KERNEL_DIR)/mem.c -o $(BIN_DIR)/mem.o
+
 # Compile Ports Driver
 $(PORTS_OBJ): $(PORTS_C) | $(BIN_DIR)
 	$(CC) $(CFLAGS) $(PORTS_C) -o $(PORTS_OBJ)
@@ -80,8 +84,8 @@ $(ISR_OBJ): $(ISR_C) | $(BIN_DIR)
 	$(CC) $(CFLAGS) $(ISR_C) -o $(ISR_OBJ)
 
 # Link kernel
-$(KERNEL_BIN): $(KERNEL_ENTRY_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(PORTS_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ) linker.ld
-	$(LD) $(LDFLAGS) -o $(KERNEL_BIN) $(KERNEL_ENTRY_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(PORTS_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ)
+$(KERNEL_BIN): $(KERNEL_ENTRY_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(PORTS_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ) $(BIN_DIR)/mem.o linker.ld
+	$(LD) $(LDFLAGS) -o $(KERNEL_BIN) $(KERNEL_ENTRY_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(PORTS_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ) $(BIN_DIR)/mem.o
 
 # Create OS image (bootloader + kernel)
 $(OS_IMAGE): $(BOOTLOADER_BIN) $(KERNEL_BIN)
