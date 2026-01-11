@@ -16,6 +16,7 @@ SRC_DIR = src
 BOOT_DIR = $(SRC_DIR)/boot
 KERNEL_DIR = $(SRC_DIR)/kernel
 DRIVERS_DIR = $(SRC_DIR)/drivers
+CPU_DIR = $(SRC_DIR)/cpu
 BIN_DIR = bin
 
 # Files
@@ -27,6 +28,12 @@ KERNEL_C = $(KERNEL_DIR)/kernel.c
 KERNEL_OBJ = $(BIN_DIR)/kernel.o
 SCREEN_C = $(DRIVERS_DIR)/screen.c
 SCREEN_OBJ = $(BIN_DIR)/screen.o
+IDT_C = $(CPU_DIR)/idt.c
+IDT_OBJ = $(BIN_DIR)/idt.o
+ISR_C = $(CPU_DIR)/isr.c
+ISR_OBJ = $(BIN_DIR)/isr.o
+INTERRUPT_ASM = $(CPU_DIR)/interrupt.asm
+INTERRUPT_OBJ = $(BIN_DIR)/interrupt.o
 KERNEL_BIN = $(BIN_DIR)/kernel.bin
 OS_IMAGE = $(BIN_DIR)/os-image.bin
 
@@ -47,6 +54,10 @@ $(BOOTLOADER_BIN): $(BOOTLOADER) | $(BIN_DIR)
 $(KERNEL_ENTRY_OBJ): $(KERNEL_ENTRY) | $(BIN_DIR)
 	$(ASM) -f elf $(KERNEL_ENTRY) -o $(KERNEL_ENTRY_OBJ)
 
+# Assemble interrupt stubs
+$(INTERRUPT_OBJ): $(INTERRUPT_ASM) | $(BIN_DIR)
+	$(ASM) -f elf $(INTERRUPT_ASM) -o $(INTERRUPT_OBJ)
+
 # Compile C kernel
 $(KERNEL_OBJ): $(KERNEL_C) | $(BIN_DIR)
 	$(CC) $(CFLAGS) $(KERNEL_C) -o $(KERNEL_OBJ)
@@ -55,15 +66,23 @@ $(KERNEL_OBJ): $(KERNEL_C) | $(BIN_DIR)
 $(SCREEN_OBJ): $(SCREEN_C) | $(BIN_DIR)
 	$(CC) $(CFLAGS) $(SCREEN_C) -o $(SCREEN_OBJ)
 
+# Compile IDT
+$(IDT_OBJ): $(IDT_C) | $(BIN_DIR)
+	$(CC) $(CFLAGS) $(IDT_C) -o $(IDT_OBJ)
+
+# Compile ISR
+$(ISR_OBJ): $(ISR_C) | $(BIN_DIR)
+	$(CC) $(CFLAGS) $(ISR_C) -o $(ISR_OBJ)
+
 # Link kernel
-$(KERNEL_BIN): $(KERNEL_ENTRY_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) linker.ld
-	$(LD) $(LDFLAGS) -o $(KERNEL_BIN) $(KERNEL_ENTRY_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ)
+$(KERNEL_BIN): $(KERNEL_ENTRY_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ) linker.ld
+	$(LD) $(LDFLAGS) -o $(KERNEL_BIN) $(KERNEL_ENTRY_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ)
 
 # Create OS image (bootloader + kernel)
 $(OS_IMAGE): $(BOOTLOADER_BIN) $(KERNEL_BIN)
 	cat $(BOOTLOADER_BIN) $(KERNEL_BIN) > $(OS_IMAGE)
 	# Pad with zeros to ensure we have enough sectors for the disk read
-	truncate -s 10k $(OS_IMAGE)
+	truncate -s 32k $(OS_IMAGE)
 	@echo "OS Image built successfully! Size: $$(wc -c < $(OS_IMAGE)) bytes"
 	@ls -lh $(OS_IMAGE)
 

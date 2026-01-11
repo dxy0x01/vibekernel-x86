@@ -22,7 +22,7 @@ start:
 
     ; Load Kernel
     mov bx, KERNEL_OFFSET ; Read from disk and store in 0x1000
-    mov dh, 15 ; Load 15 sectors (plenty of space)
+    mov dh, 50 ; Load 50 sectors (plenty of space)
     mov dl, [boot_drive]
     call disk_load
 
