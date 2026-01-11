@@ -1,4 +1,10 @@
+[global tss_load]
 [global gdt_flush]
+
+tss_load:
+    mov ax, [esp+4]   ; Get the selector
+    ltr ax            ; Load the task register
+    ret
 
 gdt_flush:
     mov eax, [esp+4]  ; Get the pointer to the GDT, passed as a parameter.
