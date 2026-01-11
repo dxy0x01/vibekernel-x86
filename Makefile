@@ -40,6 +40,8 @@ DISK_STREAM_C = $(DRIVERS_DIR)/disk_stream.c
 DISK_STREAM_OBJ = $(BIN_DIR)/disk_stream.o
 FAT16_C = $(SRC_DIR)/fs/fat16.c
 FAT16_OBJ = $(BIN_DIR)/fat16.o
+VFS_C = $(SRC_DIR)/fs/file.c
+VFS_OBJ = $(BIN_DIR)/file.o
 GDT_C = $(CPU_DIR)/gdt.c
 GDT_OBJ = $(BIN_DIR)/gdt.o
 GDT_ASM = $(CPU_DIR)/gdt.asm
@@ -108,6 +110,12 @@ $(FAT16_OBJ): $(FAT16_C) | $(BIN_DIR)
 $(BIN_DIR)/string.o: $(SRC_DIR)/string/string.c | $(BIN_DIR)
 	$(CC) $(CFLAGS) $(SRC_DIR)/string/string.c -o $(BIN_DIR)/string.o
 
+# Compile VFS
+$(VFS_OBJ): $(VFS_C) | $(BIN_DIR)
+	$(CC) $(CFLAGS) $(VFS_C) -o $(VFS_OBJ)
+
+# Compile Path Parser
+
 # Compile Path Parser
 $(BIN_DIR)/path_parser.o: $(SRC_DIR)/fs/path_parser.c | $(BIN_DIR)
 	$(CC) $(CFLAGS) $(SRC_DIR)/fs/path_parser.c -o $(BIN_DIR)/path_parser.o
@@ -128,8 +136,8 @@ $(GDT_ASM_OBJ): $(GDT_ASM) | $(BIN_DIR)
 	$(ASM) -f elf $(GDT_ASM) -o $(GDT_ASM_OBJ)
 
 # Link kernel
-$(KERNEL_BIN): $(KERNEL_ENTRY_OBJ) $(GDT_ASM_OBJ) $(GDT_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(PORTS_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ) $(BIN_DIR)/kheap.o $(BIN_DIR)/paging.o $(BIN_DIR)/serial.o $(BIN_DIR)/ata.o $(DISK_STREAM_OBJ) $(BIN_DIR)/string.o $(BIN_DIR)/path_parser.o $(FAT16_OBJ) linker.ld
-	$(LD) $(LDFLAGS) -o $(KERNEL_BIN) $(KERNEL_ENTRY_OBJ) $(GDT_ASM_OBJ) $(GDT_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(PORTS_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ) $(BIN_DIR)/kheap.o $(BIN_DIR)/paging.o $(BIN_DIR)/serial.o $(BIN_DIR)/ata.o $(DISK_STREAM_OBJ) $(BIN_DIR)/string.o $(BIN_DIR)/path_parser.o $(FAT16_OBJ)
+$(KERNEL_BIN): $(KERNEL_ENTRY_OBJ) $(GDT_ASM_OBJ) $(GDT_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(PORTS_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ) $(BIN_DIR)/kheap.o $(BIN_DIR)/paging.o $(BIN_DIR)/serial.o $(BIN_DIR)/ata.o $(DISK_STREAM_OBJ) $(BIN_DIR)/string.o $(BIN_DIR)/path_parser.o $(FAT16_OBJ) $(VFS_OBJ) linker.ld
+	$(LD) $(LDFLAGS) -o $(KERNEL_BIN) $(KERNEL_ENTRY_OBJ) $(GDT_ASM_OBJ) $(GDT_OBJ) $(KERNEL_OBJ) $(SCREEN_OBJ) $(PORTS_OBJ) $(IDT_OBJ) $(ISR_OBJ) $(INTERRUPT_OBJ) $(BIN_DIR)/kheap.o $(BIN_DIR)/paging.o $(BIN_DIR)/serial.o $(BIN_DIR)/ata.o $(DISK_STREAM_OBJ) $(BIN_DIR)/string.o $(BIN_DIR)/path_parser.o $(FAT16_OBJ) $(VFS_OBJ)
 
 # Create OS image (bootloader + kernel)
 $(OS_IMAGE): $(BOOTLOADER_BIN) $(KERNEL_BIN)

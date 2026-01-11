@@ -72,14 +72,19 @@ struct fat_file_descriptor {
     uint32_t pos;
 };
 
-int fat16_init(int disk_id);
-struct fat_file_descriptor* fat16_open(const char* filename);
-int fat16_read(struct fat_file_descriptor* desc, uint32_t size, uint32_t nmemb, char* out);
-int fat16_seek(struct fat_file_descriptor* desc, uint32_t offset, int whence);
-void fat16_close(struct fat_file_descriptor* desc);
+#include "file.h"
+
+int fat16_resolve(struct disk* disk);
+void* fat16_open_vfs(struct disk* disk, struct path_part* path, FILE_MODE mode);
+struct filesystem* fat16_init_vfs();
+
+int fat16_read(struct disk* disk, void* private, uint32_t size, uint32_t nmemb, char* out);
+int fat16_seek(void* private, uint32_t offset, FILE_SEEK_MODE whence);
+int fat16_close(void* private);
 
 // For Testing
-uint32_t fat16_cluster_to_sector(uint32_t cluster);
-uint32_t fat16_get_root_directory_sector();
-uint32_t fat16_get_bytes_per_sector();
+uint32_t fat16_cluster_to_sector(struct disk* disk, uint32_t cluster);
+uint32_t fat16_get_root_directory_sector(struct disk* disk);
+uint32_t fat16_get_bytes_per_sector(struct disk* disk);
+
 #endif

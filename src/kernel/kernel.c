@@ -13,6 +13,7 @@
 
 #include "../drivers/disk_stream.h"
 #include "../fs/fat16.h"
+#include "../fs/file.h"
 
 // Simulate idt_init if it doesn't match exactly yet
 void idt_init() {
@@ -132,7 +133,7 @@ void main() {
 
     // Test Path Parser
     serial_print("Testing Path Parser...\n");
-    struct path_root* root = pathparser_parse("0:/home/usr/test.txt", NULL);
+    struct path_root* root = path_parser_parse("0:/home/usr/test.txt", NULL);
     if (root) {
         serial_print("Parsed Drive: ");
         serial_putc(root->drive_no + '0');
@@ -145,7 +146,7 @@ void main() {
             part = part->next;
         }
         serial_print("Freeing path parser root...\n");
-        pathparser_free(root);
+        path_parser_free(root);
         serial_print("Freeing Success.\n");
     } else {
         serial_print("Path parsing FAILED!\n");
@@ -153,55 +154,69 @@ void main() {
 
     // Test FAT16
     serial_print("Testing FAT16 Filesystem on Drive 1...\n");
-    int fat_res = fat16_init(1);
+    
+    // --- Recursive VFS Verification: Manual Injection ---
+    serial_print("Injecting DIR/TEST.TXT into Drive 1...\n");
+    
+    struct disk drive1 = {1, NULL};
+    int fat_res = fat16_resolve(&drive1); // Set up drive1.fs_private
     if (fat_res == 0) {
         serial_print("FAT16 Initialized Successfully!\n");
+        uint32_t root_sec = fat16_get_root_directory_sector(&drive1); 
         
-        // --- End-to-End Verification: Manual File Injection ---
-        serial_print("Injecting 'TEST.TXT' into Drive 1 root directory...\n");
-        
-        uint32_t root_sec = fat16_get_root_directory_sector();
         uint16_t* root_buf = (uint16_t*)kmalloc(512);
-        
-        // Read current root directory (to preserve other entries if any, though it's likely empty)
         ata_read_sector(1, root_sec, root_buf);
         
-        struct fat_directory_item* entry = (struct fat_directory_item*)root_buf;
-        memcpy(entry->filename, "TEST    ", 8);
-        memcpy(entry->ext, "TXT", 3);
-        entry->attribute = 0x20;
-        entry->low_16_bits_first_cluster = 2;
-        entry->filesize = 14; 
+        struct fat_directory_item* dir_entry = (struct fat_directory_item*)root_buf;
+        memcpy(dir_entry->filename, "DIR     ", 8);
+        memcpy(dir_entry->ext, "   ", 3);
+        dir_entry->attribute = 0x10; // Subdirectory
+        dir_entry->low_16_bits_first_cluster = 3; // DIR data starts at cluster 3
         
-        // Write back the root directory sector
         ata_write_sector(1, root_sec, root_buf);
         
-        // Prepare data for cluster 2
-        uint32_t data_sec = fat16_cluster_to_sector(2);
-        uint16_t* data_buf = (uint16_t*)kmalloc(512);
-        memset(data_buf, 0, 512);
-        memcpy(data_buf, "Hello FAT16!\n", 14);
+        // Prepare DIR cluster (containing TEST.TXT)
+        uint32_t dir_sec = fat16_cluster_to_sector(&drive1, 3);
+        uint16_t* dir_buf = (uint16_t*)kmalloc(512);
+        memset(dir_buf, 0, 512);
+        struct fat_directory_item* file_entry = (struct fat_directory_item*)dir_buf;
+        memcpy(file_entry->filename, "TEST    ", 8);
+        memcpy(file_entry->ext, "TXT", 3);
+        file_entry->attribute = 0x20;
+        file_entry->low_16_bits_first_cluster = 4; // FILE data starts at cluster 4
+        file_entry->filesize = 18; 
         
-        // Write data to Drive 1
-        ata_write_sector(1, data_sec, data_buf);
+        ata_write_sector(1, dir_sec, dir_buf);
         
-        serial_print("Injection complete. Attempting to open TEST.TXT...\n");
+        // Prepare FILE data
+        uint32_t file_sec = fat16_cluster_to_sector(&drive1, 4);
+        uint16_t* file_buf = (uint16_t*)kmalloc(512);
+        memset(file_buf, 0, 512);
+        memcpy(file_buf, "Recursive Success!", 18);
+        ata_write_sector(1, file_sec, file_buf);
         
-        struct fat_file_descriptor* fd = fat16_open("TEST.TXT");
-        if (fd) {
-            serial_print("TEST.TXT opened successfully!\n");
-            char read_back[16];
-            memset(read_back, 0, 16);
-            int read_res = fat16_read(fd, 1, 14, read_back);
-            if (read_res == 14) {
-                serial_print("File contents: ");
-                serial_print(read_back);
-            } else {
-                serial_print("Read FAILED!\n");
-            }
-            fat16_close(fd);
+        serial_print("Injection complete. Attempting to open 1:/DIR/TEST.TXT via VFS...\n");
+        
+        fs_init();
+        fs_insert_filesystem(fat16_init_vfs());
+        
+        int fd = fopen("1:/DIR/TEST.TXT", "r");
+        if (fd > 0) {
+            serial_print("Opened successfully!\n");
+            char read_back[20];
+            memset(read_back, 0, 20);
+            fread(read_back, 1, 18, fd);
+            serial_print("Content: ");
+            serial_print(read_back);
+            serial_print("\n");
+            fclose(fd);
         } else {
-            serial_print("Failed to open TEST.TXT!\n");
+            serial_print("Failed to open via VFS. Code: ");
+            if (fd < 0) {
+                uint32_t val = -fd;
+                serial_putc(val + '0');
+            }
+            serial_print("\n");
         }
     } else {
         serial_print("FAT16 Initialization FAILED! Code: ");

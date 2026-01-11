@@ -4,7 +4,7 @@
 #include "../memory/paging/paging.h" // For any alignment/paging needs if any, though kheap is enough
 #include "../drivers/serial.h"
 
-static int pathparser_get_drive_no(const char** path) {
+static int path_parser_get_drive_no(const char** path) {
     if (!isdigit((*path)[0]) || (*path)[1] != ':' || (*path)[2] != '/') {
         return -1;
     }
@@ -14,14 +14,14 @@ static int pathparser_get_drive_no(const char** path) {
     return drive_no;
 }
 
-static struct path_root* pathparser_create_root(int drive_no) {
+static struct path_root* path_parser_create_root(int drive_no) {
     struct path_root* root = kmalloc(sizeof(struct path_root));
     root->drive_no = drive_no;
     root->first = NULL;
     return root;
 }
 
-static const char* pathparser_get_next_part(const char** path) {
+static const char* path_parser_get_next_part(const char** path) {
     char* result = kmalloc(256); // Max path part length
     int i = 0;
     while (**path && **path != '/') {
@@ -42,17 +42,17 @@ static const char* pathparser_get_next_part(const char** path) {
     return result;
 }
 
-struct path_root* pathparser_parse(const char* path, const char* current_directory_path) {
+struct path_root* path_parser_parse(const char* path, const char* current_directory_path) {
     const char* tmp_path = path;
-    int drive_no = pathparser_get_drive_no(&tmp_path);
+    int drive_no = path_parser_get_drive_no(&tmp_path);
     if (drive_no < 0) return NULL;
 
-    struct path_root* root = pathparser_create_root(drive_no);
+    struct path_root* root = path_parser_create_root(drive_no);
     struct path_part* first_part = NULL;
     struct path_part* last_part = NULL;
 
     while (1) {
-        const char* part_str = pathparser_get_next_part(&tmp_path);
+        const char* part_str = path_parser_get_next_part(&tmp_path);
         if (!part_str) break;
 
         struct path_part* part = kmalloc(sizeof(struct path_part));
@@ -71,7 +71,7 @@ struct path_root* pathparser_parse(const char* path, const char* current_directo
     return root;
 }
 
-void pathparser_free(struct path_root* root) {
+void path_parser_free(struct path_root* root) {
     struct path_part* part = root->first;
     while (part) {
         struct path_part* next = part->next;
