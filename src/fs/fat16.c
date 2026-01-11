@@ -245,9 +245,22 @@ int fat16_resolve(struct disk* disk) {
         return -2;
     }
     
-    if (bpb.signature != 0x29) {
+    // Check boot signature 0xAA55 at offset 510
+    if (bpb.boot_signature != 0xAA55) {
+        diskstream_close(stream);
+        return -3;
+    }
+
+    // Check Extended BPB signature (0x28 or 0x29)
+    if (bpb.signature != 0x29 && bpb.signature != 0x28) {
         diskstream_close(stream);
         return -4;
+    }
+
+    // Basic consistency checks
+    if (bpb.bytes_per_sector != 512 || bpb.sectors_per_cluster == 0) {
+        diskstream_close(stream);
+        return -5;
     }
     
     struct fat_private* private = kmalloc(sizeof(struct fat_private));

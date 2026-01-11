@@ -71,32 +71,59 @@ static FILE_MODE fs_parse_mode(const char* str) {
 }
 
 int fopen(const char* filename, const char* mode_str) {
+    int res = 0;
     struct path_root* root_path = path_parser_parse(filename, NULL);
-    if (!root_path) return -1;
-    if (!root_path->first) return -2; // Just drive or invalid
+    if (!root_path) {
+        res = -1;
+        goto out;
+    }
 
-    // Assuming drive ID is the disk index for now
+    if (!root_path->first) {
+        res = -2;
+        goto out;
+    }
+
     int drive_no = root_path->drive_no;
-    if (drive_no < 0 || drive_no > 1) return -3;
+    if (drive_no < 0 || drive_no > 1) {
+        res = -3;
+        goto out;
+    }
+    
     struct disk* disk = &disks[drive_no];
-
     struct filesystem* fs = fs_resolve(disk);
-    if (!fs) return -4;
+    if (!fs) {
+        res = -4;
+        goto out;
+    }
 
     FILE_MODE mode = fs_parse_mode(mode_str);
-    if (mode == FILE_MODE_INVALID) return -5;
+    if (mode == FILE_MODE_INVALID) {
+        res = -5;
+        goto out;
+    }
 
     void* fs_private = fs->open(disk, root_path->first, mode);
-    if (!fs_private) return -6;
+    if (!fs_private) {
+        res = -6;
+        goto out;
+    }
 
     struct file_descriptor* desc = fs_new_descriptor();
-    if (!desc) return -7;
+    if (!desc) {
+        res = -7;
+        goto out;
+    }
 
     desc->filesystem = fs;
     desc->private = fs_private;
     desc->disk = disk;
+    res = desc->index;
 
-    return desc->index;
+out:
+    if (root_path) {
+        path_parser_free(root_path);
+    }
+    return res;
 }
 
 int fread(void* ptr, uint32_t size, uint32_t nmemb, int fd) {

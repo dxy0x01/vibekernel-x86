@@ -211,12 +211,23 @@ void main() {
             serial_print("\n");
             fclose(fd);
         } else {
-            serial_print("Failed to open via VFS. Code: ");
+            serial_print("Failed to open 1:/DIR/TEST.TXT via VFS. Code: ");
             if (fd < 0) {
                 uint32_t val = -fd;
                 serial_putc(val + '0');
             }
             serial_print("\n");
+        }
+
+        serial_print("Testing robustness: Opening non-existent file 1:/NONEXIST.TXT...\n");
+        int fd_bad = fopen("1:/NONEXIST.TXT", "r");
+        if (fd_bad < 0) {
+            serial_print("VFS correctly rejected non-existent file. Error code: -");
+            serial_putc((-fd_bad) + '0');
+            serial_print("\n");
+        } else {
+            serial_print("VFS INCORRECTLY opened non-existent file!\n");
+            fclose(fd_bad);
         }
     } else {
         serial_print("FAT16 Initialization FAILED! Code: ");
