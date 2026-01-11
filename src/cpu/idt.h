@@ -23,7 +23,14 @@ typedef struct {
 extern idt_gate_t idt[IDT_ENTRIES];
 extern idt_register_t idt_reg;
 
-void set_idt_gate(int n, uint32_t handler);
+// IDT Flags
+#define IDT_PRESENT                0x80
+#define IDT_DPL_0                  0x00
+#define IDT_DPL_3                  0x60
+#define IDT_TYPE_INTERRUPT_GATE_32 0x0E
+#define IDT_TYPE_TRAP_GATE_32      0x0F
+
+void set_idt_gate(int n, uint32_t handler, uint8_t flags);
 void set_idt();
 
 #endif
